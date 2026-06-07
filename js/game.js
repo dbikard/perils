@@ -49,6 +49,15 @@
   game.addEffect = function (e) { game.effects.push(e); };
   game.announce = function (text, dur) { game.banner = { text, life: dur || 2.5 }; };
 
+  // apply damage to the player, reduced by armour tier (capped); respects i-frames
+  game.damagePlayer = function (amount) {
+    const p = game.player;
+    if (p.invuln > 0) return;
+    const reduction = Math.min(0.6, p.armor * 0.07);
+    p.hp -= amount * (1 - reduction);
+    p.hitFlash = 0.12;
+  };
+
   const WARP_TIME = 300; // seconds of siege before the warp drive is ready (tunable)
 
   function startGame() {

@@ -34,6 +34,7 @@
       level: 1, xp: 0, xpNext: 5,
       magnet: 95,           // crystal pickup radius (px)
       regen: 0,             // hp per second
+      armor: 0,             // armour tier — reduces damage taken + adds visible plating
       overload: 0,          // seconds of Overload weapon surge remaining
       // multipliers read live by the weapon/movement systems
       stats: { speedMult: 1, damageMult: 1, cooldownMult: 1, count: 1 },

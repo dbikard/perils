@@ -188,21 +188,75 @@
     ctx.restore();
   }
 
-  function drawPlayer(ctx, game) {
-    const p = game.player;
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.shadowColor = '#38e8ff';
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = p.hitFlash > 0 ? '#ffffff' : (p.invuln > 0 ? '#bff7ff' : '#9af0ff');
-    // diamond ship
+  function roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
-    ctx.moveTo(0, -p.r); ctx.lineTo(p.r * 0.8, 0); ctx.lineTo(0, p.r); ctx.lineTo(-p.r * 0.8, 0);
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#eaffff'; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  // Top-down space fighter. Faces its heading; gains armour plates as p.armor rises
+  // (0 = plain jumpsuit, 1 = helmet+visor, 2 = chest plate, 3 = shoulders, 5 = back plate).
+  function drawPlayer(ctx, game) {
+    const p = game.player, r = p.r, armor = p.armor || 0, flash = p.hitFlash > 0;
+    const ang = Math.atan2(p.facingY, p.facingX);
+    const dark = flash ? '#fff' : '#05070d';
+    const TAU = Engine.TAU;
+
+    // soft glow under the fighter (visibility on dark floors)
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(56,232,255,0.20)';
+    ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.5, 0, TAU); ctx.fill();
     ctx.restore();
+
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.rotate(ang);
+
+    // engine exhaust (rear, -x)
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(56,232,255,0.6)';
+    ctx.beginPath(); ctx.ellipse(-r * 1.05, 0, r * 0.55, r * 0.32, 0, 0, TAU); ctx.fill(); ctx.restore();
+
+    // torso (jumpsuit; lightens/metallises with armour)
+    ctx.fillStyle = flash ? '#fff' : (armor >= 4 ? '#ccd6e6' : armor >= 2 ? '#aeb8ca' : '#98a1b6');
+    roundRect(ctx, -r * 0.85, -r * 0.72, r * 1.6, r * 1.44, r * 0.55); ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = flash ? '#fff' : 'rgba(56,232,255,0.5)'; ctx.stroke();
+
+    // weapon held forward
+    ctx.fillStyle = flash ? '#fff' : '#5a6478'; ctx.fillRect(r * 0.35, r * 0.12, r * 1.05, r * 0.36);
+    ctx.fillStyle = flash ? '#fff' : '#39404f'; ctx.fillRect(r * 1.15, r * 0.16, r * 0.28, r * 0.28);
+
+    // back plate (armour 5+)
+    if (armor >= 5) { ctx.fillStyle = flash ? '#fff' : '#7fd8ff'; roundRect(ctx, -r * 0.82, -r * 0.45, r * 0.4, r * 0.9, r * 0.2); ctx.fill(); }
+    // shoulder pads (armour 3+)
+    if (armor >= 3) {
+      ctx.fillStyle = flash ? '#fff' : '#38e8ff';
+      ctx.beginPath(); ctx.arc(-r * 0.15, -r * 0.78, r * 0.4, 0, TAU); ctx.arc(-r * 0.15, r * 0.78, r * 0.4, 0, TAU); ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = dark; ctx.stroke();
+    }
+    // chest plate (armour 2+)
+    if (armor >= 2) {
+      ctx.fillStyle = flash ? '#fff' : '#57c2dc';
+      roundRect(ctx, -r * 0.25, -r * 0.5, r * 0.95, r * 1.0, r * 0.3); ctx.fill();
+      ctx.lineWidth = 1.2; ctx.strokeStyle = dark; ctx.stroke();
+    }
+
+    // head / helmet (front, +x)
+    ctx.beginPath(); ctx.arc(r * 0.5, 0, r * 0.5, 0, TAU);
+    ctx.fillStyle = flash ? '#fff' : (armor >= 1 ? '#cdd8e8' : '#e6c79a'); ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = dark; ctx.stroke();
+    if (armor >= 1) { ctx.fillStyle = flash ? '#fff' : '#38e8ff'; ctx.fillRect(r * 0.66, -r * 0.26, r * 0.26, r * 0.52); }
+
+    ctx.restore();
+
+    // invulnerability bubble (Blink / Deflector)
+    if (p.invuln > 0) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(159,240,255,0.7)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.5, 0, TAU); ctx.stroke(); ctx.restore();
+    }
   }
 
   function drawEffectsWorld(ctx, game) {

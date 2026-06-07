@@ -75,7 +75,7 @@
       // contact damage
       const pr = e.r + p.r;
       if ((e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y) < pr * pr) {
-        if (p.invuln <= 0) { p.hp -= e.damage * dt; p.hitFlash = 0.12; }
+        game.damagePlayer(e.damage * dt);
       }
     }
   }
@@ -88,7 +88,7 @@
       if (ep.life <= 0 || map.isWallWorld(ep.x, ep.y)) { game.enemyProjectiles.release(ep); continue; }
       const rr = ep.r + p.r;
       if ((ep.x - p.x) * (ep.x - p.x) + (ep.y - p.y) * (ep.y - p.y) < rr * rr) {
-        if (p.invuln <= 0) { p.hp -= ep.damage; p.hitFlash = 0.14; }
+        game.damagePlayer(ep.damage);
         game.enemyProjectiles.release(ep);
       }
     }
