@@ -78,6 +78,15 @@ html, body {
   text-align: center;
   padding: 24px;
 }
+#portrait {
+  width: 132px;
+  height: 132px;
+  image-rendering: pixelated;
+  border: 2px solid #2a4673;
+  border-radius: 10px;
+  box-shadow: 0 0 22px rgba(56, 232, 255, 0.4);
+  margin-bottom: 6px;
+}
 #menu h1 {
   font-size: clamp(48px, 16vw, 96px);
   font-weight: 800;

@@ -24,7 +24,7 @@
     const finish = () => { if (--pending <= 0 && !done) { done = true; Sprites.ace = ace; Sprites.ready = true; } };
     tiers.forEach((t) => {
       ace[t] = [];
-      for (let f = 0; f < 3; f++) {
+      for (let f = 0; f < 5; f++) {
         pending++;
         const img = new Image();
         const idx = f;

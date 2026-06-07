@@ -84,6 +84,8 @@
           if (k >= targets.length) { const a = ((k - targets.length + 1) * 0.18) * (k % 2 ? 1 : -1), c = Math.cos(a), si = Math.sin(a); const rx = dx * c - dy * si, ry = dx * si + dy * c; dx = rx; dy = ry; }
           spawnProjectile(game, p.x, p.y, dx, dy, s.speed, s.projR, dmg, s.life, s.pierce, this.color);
         }
+        const m0 = targets[0], mdx = m0.x - p.x, mdy = m0.y - p.y, ml = Math.hypot(mdx, mdy) || 1;
+        game.addEffect({ type: 'muzzle', x: p.x + mdx / ml * p.r * 1.2, y: p.y + mdy / ml * p.r * 1.2, angle: Math.atan2(mdy, mdx), life: 0.07, maxLife: 0.07, color: this.color });
       }
     },
 
@@ -102,6 +104,7 @@
           const a = base + (t - 0.5) * s.spread;
           spawnProjectile(game, p.x, p.y, Math.cos(a), Math.sin(a), s.speed, s.projR, dmg, s.life, 0, this.color);
         }
+        game.addEffect({ type: 'muzzle', x: p.x + dir.x * p.r * 1.2, y: p.y + dir.y * p.r * 1.2, angle: base, life: 0.07, maxLife: 0.07, color: this.color });
       }
     },
 
@@ -140,6 +143,7 @@
         const dmg = s.damage * e.dmg, half = s.width / 2;
         const ex = p.x + dir.x * s.range, ey = p.y + dir.y * s.range;
         game.addEffect({ type: 'trail', x0: p.x, y0: p.y, x1: ex, y1: ey, life: 0.12, maxLife: 0.12, color: this.color });
+        game.addEffect({ type: 'muzzle', x: p.x + dir.x * p.r * 1.2, y: p.y + dir.y * p.r * 1.2, angle: Math.atan2(dir.y, dir.x), life: 0.08, maxLife: 0.08, color: this.color });
         const list = game.enemies.active;
         for (let i = list.length - 1; i >= 0; i--) {
           const en = list[i];

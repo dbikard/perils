@@ -212,7 +212,7 @@
     let drew = false;
     if (S && S.ready && S.ace) {
       const set = S.ace[S.tierFor(p.armor || 0)] || S.ace.basic;
-      const frame = p.moving ? (1 + (Math.floor(p.animTime * 9) % 2)) : 0;
+      const frame = p.moving ? (1 + (Math.floor(p.animTime * 9) % 4)) : 0; // 4-frame walk
       const spr = set[frame] || set[0];
       if (spr) {
         const scale = (r * 2.8) / spr.h;
@@ -259,6 +259,14 @@
         ctx.globalAlpha = Math.max(0, e.life / e.maxLife) * 0.85;
         ctx.strokeStyle = e.color; ctx.lineWidth = 9; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(e.x0, e.y0); ctx.lineTo(e.x1, e.y1); ctx.stroke();
+      } else if (e.type === 'muzzle') {
+        ctx.globalAlpha = Math.max(0, e.life / e.maxLife);
+        ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);
+        ctx.fillStyle = e.color || '#fff2b0';
+        ctx.beginPath(); ctx.moveTo(0, -3.5); ctx.lineTo(14, 0); ctx.lineTo(0, 3.5); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(3, 0, 3, 0, Engine.TAU); ctx.fill();
+        ctx.restore();
       }
     }
     ctx.globalAlpha = 1;
