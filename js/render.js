@@ -97,23 +97,41 @@
   }
 
   function drawEnemies(ctx, game) {
-    const list = game.enemies.active;
+    const list = game.enemies.active, S = global.Sprites, t = game.timeSec, px = game.player.x;
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
-      pathShape(ctx, e.shape, e.x, e.y, e.r);
-      ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color;
-      ctx.fill();
-      ctx.lineWidth = e.boss ? 3 : 1.5;
-      ctx.strokeStyle = e.boss ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)';
-      ctx.stroke();
+      const set = (S && S.ready && S.enemy) ? S.enemy[e.type] : null;
+      let drew = false;
+      if (set) {
+        const frame = (((Math.floor(t * 5 + e.x * 0.05)) % 2) + 2) % 2; // 2-frame, phased by position
+        const spr = set[frame] || set[0];
+        if (spr) {
+          const scale = (e.r * 2.4) / spr.h;
+          const sw = spr.w * scale, sh = spr.h * scale;
+          const img = e.hitFlash > 0 ? spr.white : spr.img;
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          ctx.translate(e.x, e.y);
+          if (px < e.x) ctx.scale(-1, 1); // face the player
+          ctx.drawImage(img, -sw / 2, -sh * 0.55, sw, sh);
+          ctx.restore();
+          drew = true;
+        }
+      }
+      if (!drew) {
+        pathShape(ctx, e.shape, e.x, e.y, e.r);
+        ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color; ctx.fill();
+        ctx.lineWidth = e.boss ? 3 : 1.5;
+        ctx.strokeStyle = e.boss ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)'; ctx.stroke();
+      }
       if (e.stun > 0) {
         ctx.fillStyle = '#bff7ff';
         ctx.beginPath(); ctx.arc(e.x, e.y - e.r - 4, 2, 0, Engine.TAU); ctx.fill();
       }
       if (e.boss) {
         const w = e.r * 2.2, frac = Math.max(0, e.hp / e.maxHp);
-        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(e.x - w / 2, e.y - e.r - 12, w, 5);
-        ctx.fillStyle = '#ff5a6e'; ctx.fillRect(e.x - w / 2, e.y - e.r - 12, w * frac, 5);
+        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(e.x - w / 2, e.y - e.r - 16, w, 5);
+        ctx.fillStyle = '#ff5a6e'; ctx.fillRect(e.x - w / 2, e.y - e.r - 16, w * frac, 5);
       }
     }
   }

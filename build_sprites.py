@@ -184,4 +184,135 @@ for f in FRAMES:
     sheet.paste(img, (10 + f * (W * 6 + 4), 10), img)
 sheet.save('/tmp/ace_walk.png')
 to_image(outline(draw_portrait()), scale=6).save('/tmp/ace_portrait.png')
-print('wrote previews')
+print('wrote player previews')
+
+
+# ============================ ENEMIES ============================
+# extra palette (hostile reds / magentas / amber + eye glow)
+C.update({
+    'E': (232, 68, 79), 'e': (150, 40, 58), 'F': (255, 120, 140),
+    'M': (205, 75, 150), 'p': (120, 42, 92), 'A': (255, 150, 60),
+    'Y': (255, 214, 110), 'i': (255, 244, 170), 'c': (58, 28, 40),
+    'h': (250, 220, 230),
+})
+
+
+def draw_swarmer(frame):  # small red bug-drone (~16x14)
+    b = blank(16, 14)
+    wig = 0 if frame == 0 else 1
+    # legs (wiggle)
+    for lx in (4, 7, 10):
+        rect(b, lx, 10, lx, 12 - wig, 'e')
+        rect(b, lx + 1, 10, lx + 1, 11 + wig, 'e')
+    # body
+    rect(b, 3, 3, 12, 10, 'e'); rect(b, 4, 3, 11, 8, 'E')
+    rect(b, 5, 3, 9, 5, 'F')                  # carapace shine
+    # mandibles (front = right)
+    rect(b, 12, 6, 13, 6, 'e'); rect(b, 12, 8, 13, 8, 'e')
+    # eye
+    rect(b, 9, 6, 11, 8, 'i'); px(b, 10, 7, 'E')
+    # antennae
+    px(b, 11, 2, 'e'); px(b, 12, 1, 'e')
+    return b
+
+
+def draw_sprinter(frame):  # sleek fast amber dart (~18x12)
+    b = blank(18, 12)
+    tail = 0 if frame == 0 else 1
+    # streak body, pointed right
+    rect(b, 3, 4, 12, 8, 'A'); rect(b, 4, 4, 11, 6, 'Y')
+    rect(b, 12, 5, 15, 7, 'A'); px(b, 16, 6, 'Y')   # snout
+    # dorsal fin
+    rect(b, 6, 2, 9, 4, 'A'); px(b, 7, 1, 'Y')
+    # eye
+    px(b, 13, 5, 'i'); px(b, 13, 6, 'w')
+    # legs / thrust
+    rect(b, 5, 8, 6, 10 - tail, 'e'); rect(b, 9, 8, 10, 9 + tail, 'e')
+    # motion streak at back
+    rect(b, 1, 5, 2, 7, 'Y')
+    return b
+
+
+def draw_spitter(frame):  # squat amber gunner with a glowing maw (~20x18)
+    b = blank(20, 18)
+    charged = frame == 1
+    # legs
+    for lx in (5, 9, 13):
+        rect(b, lx, 13, lx + 1, 16, 'e')
+    # body
+    rect(b, 4, 5, 15, 14, 'e'); rect(b, 5, 5, 14, 12, 'A'); rect(b, 6, 5, 12, 8, 'Y')
+    # back spines
+    px(b, 6, 4, 'e'); px(b, 9, 3, 'e'); px(b, 12, 4, 'e')
+    # eye
+    rect(b, 7, 7, 9, 9, 'i'); px(b, 8, 8, 'e')
+    # front maw / cannon (right), glows when charged
+    mc = 'i' if charged else 'Y'
+    rect(b, 15, 8, 18, 12, 'e'); rect(b, 16, 9, 18, 11, mc)
+    if charged:
+        px(b, 19, 10, 'i')
+    return b
+
+
+def draw_hulk(frame):  # big magenta brute (~28x26)
+    b = blank(28, 26)
+    st = 0 if frame == 0 else 1
+    # legs
+    rect(b, 7, 21, 11, 25 - st, 'p'); rect(b, 16, 21, 20, 24 + st, 'p')
+    # torso
+    rect(b, 5, 7, 22, 22, 'p'); rect(b, 6, 8, 21, 20, 'M'); rect(b, 8, 9, 19, 14, 'F')
+    # armor plates
+    rect(b, 9, 15, 18, 19, 'p'); rect(b, 10, 16, 17, 18, 'M')
+    # shoulders / claws (front-right claw)
+    rect(b, 3, 9, 6, 16, 'p'); rect(b, 21, 9, 24, 16, 'p')
+    rect(b, 23, 11, 27, 13, 'e'); rect(b, 23, 15, 27, 17, 'e')   # claw prongs
+    # head / maw
+    rect(b, 18, 8, 23, 14, 'e'); rect(b, 19, 9, 22, 12, 'E')
+    rect(b, 20, 10, 22, 11, 'i')                                 # eye
+    px(b, 19, 13, 'i'); px(b, 21, 13, 'i')                       # fangs
+    return b
+
+
+def draw_boss(frame):  # hulking red war-mech beast (~46x40)
+    b = blank(46, 40)
+    st = 0 if frame == 0 else 1
+    # legs
+    rect(b, 11, 31, 18, 38 - st, 'c'); rect(b, 27, 31, 34, 37 + st, 'c')
+    rect(b, 12, 32, 17, 35, 'e'); rect(b, 28, 32, 33, 35, 'e')
+    # torso
+    rect(b, 8, 10, 37, 33, 'e'); rect(b, 10, 11, 35, 30, 'E'); rect(b, 12, 12, 33, 20, 'F')
+    # chest plate + core
+    rect(b, 16, 20, 29, 28, 'c'); rect(b, 18, 21, 27, 27, 'E')
+    rect(b, 20, 22, 25, 26, 'i'); rect(b, 21, 23, 24, 25, 'h')   # glowing core
+    # shoulders
+    rect(b, 4, 11, 10, 22, 'e'); rect(b, 35, 11, 41, 22, 'e')
+    rect(b, 5, 12, 9, 18, 'E'); rect(b, 36, 12, 40, 18, 'E')
+    # cannon arms
+    rect(b, 38, 14, 45, 18, 'c'); rect(b, 1, 16, 7, 20, 'c'); px(b, 0, 18, 'i')
+    # head
+    rect(b, 17, 4, 28, 13, 'e'); rect(b, 18, 5, 27, 11, 'E')
+    rect(b, 19, 7, 22, 9, 'i'); rect(b, 24, 7, 27, 9, 'i')       # two eyes
+    # horns
+    px(b, 17, 3, 'e'); px(b, 16, 2, 'e'); px(b, 28, 3, 'e'); px(b, 29, 2, 'e')
+    return b
+
+
+ENEMIES = {
+    'swarmer': draw_swarmer, 'sprinter': draw_sprinter, 'spitter': draw_spitter,
+    'hulk': draw_hulk, 'boss': draw_boss,
+}
+for name, fn in ENEMIES.items():
+    for f in (0, 1):
+        to_image(outline(fn(f))).save(os.path.join(OUT_DIR, f'enemy_{name}_{f}.png'))
+print('wrote enemy sprites')
+
+# enemy preview sheet
+cols = list(ENEMIES.items())
+maxw = max(len(fn(0)[0]) for _, fn in cols)
+maxh = max(len(fn(0)) for _, fn in cols)
+esheet = Image.new('RGBA', (maxw * 6 * len(cols) + 40, maxh * 6 * 2 + 30), (11, 20, 34, 255))
+for i, (name, fn) in enumerate(cols):
+    for f in (0, 1):
+        img = to_image(outline(fn(f)), scale=6)
+        esheet.paste(img, (10 + i * (maxw * 6 + 6), 10 + f * (maxh * 6 + 6)), img)
+esheet.save('/tmp/enemies_preview.png')
+print('wrote enemy preview')
