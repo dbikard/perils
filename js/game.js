@@ -47,6 +47,9 @@
 
   game.effects = [];
   game.addEffect = function (e) { game.effects.push(e); };
+  game.announce = function (text, dur) { game.banner = { text, life: dur || 2.5 }; };
+
+  const WARP_TIME = 300; // seconds of siege before the warp drive is ready (tunable)
 
   function startGame() {
     E.seed(Math.floor(Math.random() * 1e9));
@@ -57,15 +60,19 @@
 
     game.enemies = new global.Entities.Pool(global.Entities.newEnemy);
     game.projectiles = new global.Entities.Pool(global.Entities.newProjectile);
+    game.enemyProjectiles = new global.Entities.Pool(global.Entities.newEnemyProjectile);
+    game.mines = new global.Entities.Pool(global.Entities.newMine);
     game.crystals = new global.Entities.Pool(global.Entities.newCrystal);
     game.enemyHash = new E.SpatialHash(56);
+    game.sentries = [];
 
     const p = global.Entities.createPlayer();
     p.x = game.map.spawn.x; p.y = game.map.spawn.y;
-    p.weapons = [{ def: global.WEAPONS.pulse, timer: 0 }];
     game.player = p;
+    global.Weapons.acquire(game, 'pulse'); // starting weapon
 
     game.timeSec = 0; game.spawnTimer = 0.5; game.ffTimer = 0; game.kills = 0;
+    game.warp = 0; game.bossTimer = 120; game.enemySlow = 0; game.banner = null;
     game.effects = [];
     game.upgradeLevels = {};
     game.pendingLevels = 0;
@@ -98,6 +105,18 @@
     menu.classList.remove('hidden');
   }
 
+  function victory() {
+    game.phase = 'VICTORY';
+    E.stop();
+    const menu = document.getElementById('menu');
+    document.getElementById('hud').classList.add('hidden');
+    menu.querySelector('h1').textContent = 'ESCAPED';
+    menu.querySelector('.tagline').textContent =
+      `You fled the wreck in ${formatTime(game.timeSec)} — ${game.kills} hostiles down. The Vessel is behind you.`;
+    document.getElementById('start-btn').textContent = 'RUN AGAIN';
+    menu.classList.remove('hidden');
+  }
+
   function formatTime(s) {
     const m = Math.floor(s / 60), sec = Math.floor(s % 60);
     return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
@@ -105,9 +124,17 @@
 
   /* ---------------- main loop ---------------- */
   function update(dt) {
-    if (game.phase !== 'PLAYING') return;
+    if (game.phase !== 'PLAYING' && game.phase !== 'ESCAPE') return;
     const p = game.player, map = game.map;
     game.timeSec += dt;
+
+    // warp drive charges during the siege; when full, the run flips to the escape
+    if (game.phase === 'PLAYING') {
+      game.warp += dt / WARP_TIME;
+      if (game.warp >= 1) { game.warp = 1; game.phase = 'ESCAPE'; game.announce('WARP DRIVE ONLINE — REACH THE AIRLOCK', 3.5); }
+    }
+    if (game.enemySlow > 0) game.enemySlow -= dt;
+    if (game.banner && game.banner.life > 0) game.banner.life -= dt;
 
     // flow field recompute toward player (throttled)
     game.ffTimer -= dt;
@@ -140,13 +167,21 @@
     // abilities (Blink / Ultimate from taps + keys)
     global.Abilities.update(game, dt);
 
-    // weapons + projectiles
-    global.Weapons.fireAll(game, dt);
+    // weapons + projectiles + mines
+    global.Weapons.update(game, dt);
     global.Weapons.updateProjectiles(game, dt);
+    global.Weapons.updateMines(game, dt);
 
     // enemies
     global.Enemies.updateMovement(game, dt);
+    global.Enemies.updateEnemyProjectiles(game, dt);
     global.Enemies.updateSpawning(game, dt);
+
+    // escape: reaching the airlock wins the run
+    if (game.phase === 'ESCAPE') {
+      const ex = map.exit, rr = p.r + 30;
+      if ((p.x - ex.x) * (p.x - ex.x) + (p.y - ex.y) * (p.y - ex.y) < rr * rr) { victory(); return; }
+    }
 
     // crystal magnet/pickup → leveling
     updateCrystals(game, dt);

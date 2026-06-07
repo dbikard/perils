@@ -7,15 +7,18 @@
 
   /* ---- ability buttons (screen-space; registered as input action regions) ---- */
   UI.layoutButtons = function (game) {
-    const W = E.width, H = E.height;
-    const baseY = H - 84;
+    const W = E.width, H = E.height, p = game.player;
+    const sp = p.special;
     UI.buttons = [
-      { id: 'blink', x: W - 172, y: baseY + 6, r: 38, icon: '⟶', color: '#9af0ff',
-        ready: () => game.player.blink.cd <= 0,
-        frac: () => 1 - Math.max(0, game.player.blink.cd) / (game.player.blink.cdMax * game.player.blink.cdMult) },
-      { id: 'ultimate', x: W - 80, y: baseY, r: 46, icon: '⚡', color: '#ffd166',
-        ready: () => game.player.ult.charge >= 1,
-        frac: () => game.player.ult.charge }
+      { id: 'ultimate', x: W - 70, y: H - 86, r: 42, icon: '⚡', color: '#ffd166', locked: false,
+        ready: () => p.ult.charge >= 1, frac: () => p.ult.charge },
+      { id: 'blink', x: W - 70, y: H - 178, r: 36, icon: '⟶', color: '#9af0ff', locked: false,
+        ready: () => p.blink.cd <= 0,
+        frac: () => 1 - Math.max(0, p.blink.cd) / (p.blink.cdMax * p.blink.cdMult) },
+      { id: 'special', x: W - 156, y: H - 150, r: 36,
+        icon: sp ? sp.def.icon : '·', color: sp ? sp.def.color : '#5e77a0', locked: !sp,
+        ready: () => sp && sp.cd <= 0,
+        frac: () => sp ? 1 - Math.max(0, sp.cd) / sp.def.stats(sp.level).cd : 0 }
     ];
     E.input.actionRegions = UI.buttons.map(b => ({ id: b.id, x: b.x, y: b.y, r: b.r }));
   };
@@ -39,6 +42,7 @@
       html += `<button class="lvlup-card" data-i="${i}" style="--c:${c.color}">`
         + `<div class="lvlup-icon">${c.icon}</div>`
         + `<div class="lvlup-text">`
+        + `<div class="lvlup-tag">${c.tag || ''}</div>`
         + `<div class="lvlup-name">${c.name}</div>`
         + `<div class="lvlup-desc">${c.desc}</div>`
         + `<div class="lvlup-pips">${pips(c.level, c.max)}</div>`

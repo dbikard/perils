@@ -50,15 +50,21 @@
   }
 
   function drawExit(ctx, game) {
-    const ex = game.map.exit;
+    const ex = game.map.exit, escaping = game.phase === 'ESCAPE';
     const pulse = 0.5 + 0.5 * Math.sin(game.timeSec * 3);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = `rgba(84,255,159,${0.25 + 0.35 * pulse})`;
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(84,255,159,${(escaping ? 0.6 : 0.22) + 0.35 * pulse})`;
+    ctx.lineWidth = escaping ? 4 : 3;
     ctx.beginPath();
-    ctx.arc(ex.x, ex.y, 14 + 6 * pulse, 0, Engine.TAU);
+    ctx.arc(ex.x, ex.y, (escaping ? 26 : 14) + 8 * pulse, 0, Engine.TAU);
     ctx.stroke();
+    if (escaping) {
+      ctx.fillStyle = `rgba(84,255,159,${0.5 + 0.4 * pulse})`;
+      ctx.font = '12px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('AIRLOCK', ex.x, ex.y - 36);
+      ctx.textAlign = 'start';
+    }
     ctx.restore();
   }
 
@@ -77,17 +83,89 @@
     ctx.restore();
   }
 
+  function pathShape(ctx, shape, x, y, r) {
+    ctx.beginPath();
+    if (shape === 'tri') {
+      ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.9, y + r * 0.8); ctx.lineTo(x - r * 0.9, y + r * 0.8); ctx.closePath();
+    } else if (shape === 'square') {
+      ctx.rect(x - r, y - r, r * 2, r * 2);
+    } else if (shape === 'diamond') {
+      ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
+    } else {
+      ctx.arc(x, y, r, 0, Engine.TAU);
+    }
+  }
+
   function drawEnemies(ctx, game) {
     const list = game.enemies.active;
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, e.r, 0, Engine.TAU);
+      pathShape(ctx, e.shape, e.x, e.y, e.r);
       ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color;
       ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = e.boss ? 3 : 1.5;
+      ctx.strokeStyle = e.boss ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)';
       ctx.stroke();
+      if (e.stun > 0) {
+        ctx.fillStyle = '#bff7ff';
+        ctx.beginPath(); ctx.arc(e.x, e.y - e.r - 4, 2, 0, Engine.TAU); ctx.fill();
+      }
+      if (e.boss) {
+        const w = e.r * 2.2, frac = Math.max(0, e.hp / e.maxHp);
+        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(e.x - w / 2, e.y - e.r - 12, w, 5);
+        ctx.fillStyle = '#ff5a6e'; ctx.fillRect(e.x - w / 2, e.y - e.r - 12, w * frac, 5);
+      }
+    }
+  }
+
+  function drawEnemyProjectiles(ctx, game) {
+    const list = game.enemyProjectiles.active;
+    if (!list.length) return;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = '#ffb347';
+    for (let i = 0; i < list.length; i++) {
+      const ep = list[i];
+      ctx.beginPath(); ctx.arc(ep.x, ep.y, ep.r, 0, Engine.TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawMines(ctx, game) {
+    const list = game.mines.active;
+    for (let i = 0; i < list.length; i++) {
+      const m = list[i];
+      const arming = m.arm > 0;
+      ctx.fillStyle = arming ? 'rgba(255,90,110,0.4)' : '#ff5a6e';
+      ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Engine.TAU); ctx.fill();
+      if (!arming) {
+        const blink = 0.4 + 0.4 * Math.sin(game.timeSec * 10);
+        ctx.strokeStyle = `rgba(255,90,110,${blink})`; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(m.x, m.y, m.triggerR, 0, Engine.TAU); ctx.stroke();
+      }
+    }
+  }
+
+  function drawOrbiters(ctx, game) {
+    const ws = game.player.weapons;
+    for (let i = 0; i < ws.length; i++) {
+      if (ws[i].id !== 'orbiter') continue;
+      const st = ws[i].state, pos = st.positions, br = st.bodyR || 12;
+      if (!pos) continue;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < pos.length; k += 2) {
+        ctx.fillStyle = '#7fd8ff';
+        ctx.beginPath(); ctx.arc(pos[k], pos[k + 1], br, 0, Engine.TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawSentries(ctx, game) {
+    const list = game.sentries;
+    for (let i = 0; i < list.length; i++) {
+      const s = list[i];
+      ctx.fillStyle = '#54ff9f';
+      ctx.fillRect(s.x - 9, s.y - 9, 18, 18);
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; ctx.strokeRect(s.x - 9, s.y - 9, 18, 18);
     }
   }
 
@@ -175,6 +253,14 @@
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (let i = 0; i < btns.length; i++) {
       const b = btns[i];
+      if (b.locked) {
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Engine.TAU);
+        ctx.fillStyle = 'rgba(12,18,28,0.6)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(94,119,160,0.4)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = 'rgba(120,150,190,0.45)'; ctx.font = `${Math.floor(b.r * 0.8)}px system-ui`;
+        ctx.fillText(b.icon, b.x, b.y + 2);
+        continue;
+      }
       const ready = b.ready();
       const frac = Engine.clamp(b.frac(), 0, 1);
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Engine.TAU);
@@ -223,6 +309,42 @@
     }
   }
 
+  function drawWarp(ctx, game) {
+    const W = global.Engine.width, escaping = game.phase === 'ESCAPE';
+    const bw = Math.min(220, W - 160), bx = (W - bw) / 2, by = 62, bh = 7;
+    ctx.fillStyle = 'rgba(84,255,159,0.15)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = escaping ? '#54ff9f' : '#38a0ff';
+    ctx.fillRect(bx, by, bw * Engine.clamp(game.warp, 0, 1), bh);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+    ctx.fillStyle = 'rgba(180,210,255,0.85)'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(escaping ? 'WARP READY — REACH THE AIRLOCK' : `WARP DRIVE ${Math.floor(game.warp * 100)}%`, W / 2, by - 3);
+    ctx.textAlign = 'start';
+  }
+
+  function drawBanner(ctx, game) {
+    const b = game.banner;
+    if (!b || b.life <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, b.life);
+    ctx.fillStyle = '#ff5a6e'; ctx.font = 'bold 22px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(b.text, global.Engine.width / 2, global.Engine.height * 0.26);
+    ctx.restore(); ctx.textAlign = 'start';
+  }
+
+  function drawEscapeArrow(ctx, game) {
+    if (game.phase !== 'ESCAPE') return;
+    const ex = game.map.exit, p = game.player;
+    const s = global.Engine.worldToScreen(ex.x, ex.y);
+    const W = global.Engine.width, H = global.Engine.height, m = 44;
+    if (s.x > m && s.x < W - m && s.y > m && s.y < H - m) return; // on screen
+    const ang = Math.atan2(ex.y - p.y, ex.x - p.x);
+    const cx = Engine.clamp(s.x, m, W - m), cy = Engine.clamp(s.y, m, H - m);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+    ctx.fillStyle = '#54ff9f';
+    ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-10, -11); ctx.lineTo(-10, 11); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
   Render.draw = function (game) {
     const ctx = global.Engine.ctx, W = global.Engine.width, H = global.Engine.height, cam = global.Engine.camera;
     ctx.fillStyle = '#05070d';
@@ -233,8 +355,12 @@
     drawMap(ctx, game);
     drawExit(ctx, game);
     drawCrystals(ctx, game);
+    drawMines(ctx, game);
     drawProjectiles(ctx, game);
+    drawEnemyProjectiles(ctx, game);
+    drawSentries(ctx, game);
     drawEnemies(ctx, game);
+    drawOrbiters(ctx, game);
     drawEffectsWorld(ctx, game);
     drawPlayer(ctx, game);
     ctx.restore();
@@ -242,7 +368,10 @@
     // screen space
     drawFlash(ctx, game);
     drawXpBar(ctx, game);
+    drawWarp(ctx, game);
     drawHUDOverlay(ctx, game);
+    drawBanner(ctx, game);
+    drawEscapeArrow(ctx, game);
     drawButtons(ctx, game);
   };
 

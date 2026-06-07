@@ -29,6 +29,28 @@
       tileAtWorld(wx, wy) { return { tx: Math.floor(wx / tile), ty: Math.floor(wy / tile) }; },
       tileCenterWorld(tx, ty) { return { x: (tx + 0.5) * tile, y: (ty + 0.5) * tile }; },
 
+      // true if the segment (x0,y0)->(x1,y1) crosses no wall tile (grid DDA / voxel traversal)
+      lineClear(x0, y0, x1, y1) {
+        let tx = Math.floor(x0 / tile), ty = Math.floor(y0 / tile);
+        const txEnd = Math.floor(x1 / tile), tyEnd = Math.floor(y1 / tile);
+        if (map.isWallTile(tx, ty)) return false;
+        const dx = x1 - x0, dy = y1 - y0;
+        const stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1;
+        const tDeltaX = dx !== 0 ? Math.abs(tile / dx) : Infinity;
+        const tDeltaY = dy !== 0 ? Math.abs(tile / dy) : Infinity;
+        const nextBX = dx > 0 ? (tx + 1) * tile : tx * tile;
+        const nextBY = dy > 0 ? (ty + 1) * tile : ty * tile;
+        let tMaxX = dx !== 0 ? Math.abs((nextBX - x0) / dx) : Infinity;
+        let tMaxY = dy !== 0 ? Math.abs((nextBY - y0) / dy) : Infinity;
+        let guard = 0;
+        while ((tx !== txEnd || ty !== tyEnd) && guard++ < 2048) {
+          if (tMaxX < tMaxY) { tMaxX += tDeltaX; tx += stepX; }
+          else { tMaxY += tDeltaY; ty += stepY; }
+          if (map.isWallTile(tx, ty)) return false;
+        }
+        return true;
+      },
+
       randomFloorTile(rng) {
         const ft = map._floorTiles;
         const i = ft[Math.floor(rng() * ft.length)];

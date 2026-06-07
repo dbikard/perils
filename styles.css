@@ -156,6 +156,7 @@ html, body {
   border-radius: 10px; border: 1px solid var(--c);
 }
 .lvlup-text { flex: 1; }
+.lvlup-tag { font-size: 10px; letter-spacing: 1.5px; color: var(--c); opacity: 0.85; text-transform: uppercase; font-weight: 700; margin-bottom: 1px; }
 .lvlup-name { font-size: 17px; font-weight: 700; }
 .lvlup-desc { font-size: 13px; color: #9fb6d8; margin-top: 2px; }
 .lvlup-pips { display: flex; gap: 4px; margin-top: 8px; }

@@ -8,7 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Perils">
   <title>Perils</title>
-  <link rel="stylesheet" href="styles.css?v=0.1.0">
+  <link rel="manifest" href="manifest.json?v=0.2.0">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css?v=0.2.0">
 </head>
 <body>
   <canvas id="game"></canvas>
@@ -29,20 +32,20 @@
     <h1>PERILS</h1>
     <p class="tagline">The ship is lost. Survive until the warp drive charges &mdash; then run.</p>
     <button id="start-btn">LAUNCH</button>
-    <p class="hint">Move: drag (left) or WASD / arrows &nbsp;·&nbsp; Blink: tap ⟶ or Space &nbsp;·&nbsp; Ultimate: tap ⚡ or E</p>
+    <p class="hint">Move: drag (left) or WASD / arrows &nbsp;·&nbsp; Blink: ⟶ / Space &nbsp;·&nbsp; Special: Q &nbsp;·&nbsp; Ultimate: ⚡ / E</p>
     <p class="version"></p>
   </div>
 
-  <script>const GAME_VERSION = '0.1.0';</script>
-  <script src="js/engine.js?v=0.1.0"></script>
-  <script src="js/mapgen.js?v=0.1.0"></script>
-  <script src="js/render.js?v=0.1.0"></script>
-  <script src="js/entities.js?v=0.1.0"></script>
-  <script src="js/weapons.js?v=0.1.0"></script>
-  <script src="js/abilities.js?v=0.1.0"></script>
-  <script src="js/enemies.js?v=0.1.0"></script>
-  <script src="js/upgrades.js?v=0.1.0"></script>
-  <script src="js/ui.js?v=0.1.0"></script>
-  <script src="js/game.js?v=0.1.0"></script>
+  <script>const GAME_VERSION = '0.2.0';</script>
+  <script src="js/engine.js?v=0.2.0"></script>
+  <script src="js/mapgen.js?v=0.2.0"></script>
+  <script src="js/render.js?v=0.2.0"></script>
+  <script src="js/entities.js?v=0.2.0"></script>
+  <script src="js/weapons.js?v=0.2.0"></script>
+  <script src="js/abilities.js?v=0.2.0"></script>
+  <script src="js/enemies.js?v=0.2.0"></script>
+  <script src="js/upgrades.js?v=0.2.0"></script>
+  <script src="js/ui.js?v=0.2.0"></script>
+  <script src="js/game.js?v=0.2.0"></script>
 </body>
 </html>
