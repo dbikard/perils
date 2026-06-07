@@ -39,6 +39,9 @@
     if (!e._active) return;
     game.kills++;
     global.Abilities.addUltCharge(game, game.player.ult.perKill);
+    if (global.Particles) global.Particles.burst(game, e.x, e.y, e.color || '#ff5a6e', e.boss ? 26 : 6, e.boss ? 230 : 150);
+    if (global.SFX) global.SFX.kill();
+    if (e.boss) E.shake(11);
     // drop an XP crystal
     const c = game.crystals.spawn();
     c.x = e.x; c.y = e.y; c.r = 5; c.value = 1;
@@ -56,6 +59,8 @@
     const reduction = Math.min(0.6, p.armor * 0.07);
     p.hp -= amount * (1 - reduction);
     p.hitFlash = 0.12;
+    if (global.SFX) global.SFX.hurt();           // throttled internally
+    if (amount >= 2) E.shake(4);                  // discrete hits (bolts/spikes), not melee tick
   };
 
   const WARP_TIME = 300; // seconds of siege before the warp drive is ready (tunable)
@@ -83,6 +88,8 @@
     game.timeSec = 0; game.spawnTimer = 0.5; game.ffTimer = 0; game.kills = 0;
     game.warp = 0; game.bossTimer = 120; game.enemySlow = 0; game.banner = null;
     game.effects = [];
+    game.particles = [];
+    if (global.SFX) { global.SFX.init(); global.SFX.resume(); }
     game.upgradeLevels = {};
     game.pendingLevels = 0;
     game._choices = null;
@@ -104,6 +111,7 @@
 
   function gameOver() {
     game.phase = 'GAME_OVER';
+    if (global.SFX) global.SFX.over();
     E.stop();
     const menu = document.getElementById('menu');
     document.getElementById('hud').classList.add('hidden');
@@ -116,6 +124,7 @@
 
   function victory() {
     game.phase = 'VICTORY';
+    if (global.SFX) global.SFX.victory();
     E.stop();
     const menu = document.getElementById('menu');
     document.getElementById('hud').classList.add('hidden');
@@ -199,11 +208,13 @@
 
     // crystal magnet/pickup → leveling
     updateCrystals(game, dt);
-    if (game.pendingLevels > 0) global.UI.openLevelUp(game);
+    if (game.pendingLevels > 0) { if (global.SFX) global.SFX.level(); global.UI.openLevelUp(game); }
 
-    // age visual effects
+    // age visual effects + particles + screen shake
     const fx = game.effects;
     for (let i = fx.length - 1; i >= 0; i--) { fx[i].life -= dt; if (fx[i].life <= 0) fx.splice(i, 1); }
+    if (global.Particles) global.Particles.update(game, dt);
+    if (E.shakeTime > 0) { E.shakeTime -= dt; E.shakeMag *= 0.86; if (E.shakeTime <= 0) E.shakeMag = 0; }
 
     // camera follow (clamped to map)
     const halfW = E.width / 2, halfH = E.height / 2;
@@ -233,6 +244,7 @@
       }
       if (d2 < (p.r + c.r + 4) * (p.r + c.r + 4)) {
         p.xp += c.value;
+        if (global.Particles) global.Particles.sparkle(game, c.x, c.y, '#54ff9f');
         while (p.xp >= p.xpNext) {
           p.xp -= p.xpNext; p.level++;
           p.xpNext = Math.floor(p.xpNext * 1.35 + 2);
@@ -252,6 +264,14 @@
     const v = document.querySelector('#menu .version');
     if (v) v.textContent = 'v' + (global.GAME_VERSION || '0.0.0');
     document.getElementById('start-btn').addEventListener('click', startGame);
+
+    // audio unlock on first gesture
+    global.addEventListener('pointerdown', () => { if (global.SFX) { global.SFX.init(); global.SFX.resume(); } }, { once: true });
+    // mute toggle (button + M key)
+    const mute = document.getElementById('mute');
+    const sync = (m) => { if (mute) mute.textContent = m ? '🔇' : '🔊'; };
+    if (mute) mute.addEventListener('click', (ev) => { ev.stopPropagation(); sync(global.SFX ? global.SFX.toggle() : true); });
+    global.addEventListener('keydown', (e) => { if (e.key && e.key.toLowerCase() === 'm' && global.SFX) sync(global.SFX.toggle()); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

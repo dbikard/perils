@@ -86,6 +86,7 @@
         }
         const m0 = targets[0], mdx = m0.x - p.x, mdy = m0.y - p.y, ml = Math.hypot(mdx, mdy) || 1;
         game.addEffect({ type: 'muzzle', x: p.x + mdx / ml * p.r * 1.2, y: p.y + mdy / ml * p.r * 1.2, angle: Math.atan2(mdy, mdx), life: 0.07, maxLife: 0.07, color: this.color });
+        if (global.SFX) global.SFX.shoot();
       }
     },
 
@@ -105,6 +106,7 @@
           spawnProjectile(game, p.x, p.y, Math.cos(a), Math.sin(a), s.speed, s.projR, dmg, s.life, 0, this.color);
         }
         game.addEffect({ type: 'muzzle', x: p.x + dir.x * p.r * 1.2, y: p.y + dir.y * p.r * 1.2, angle: base, life: 0.07, maxLife: 0.07, color: this.color });
+        if (global.SFX) global.SFX.shoot();
       }
     },
 
@@ -123,6 +125,7 @@
         while (cur && hops > 0) {
           game.addEffect({ type: 'trail', x0: fromX, y0: fromY, x1: cur.x, y1: cur.y, life: 0.14, maxLife: 0.14, color: this.color });
           cur.hp -= dmg; cur.hitFlash = 0.08; seen.add(cur);
+          if (global.Particles) global.Particles.spark(game, cur.x, cur.y, this.color);
           fromX = cur.x; fromY = cur.y;
           if (cur.hp <= 0) game.killEnemy(cur);
           dmg *= 0.85; hops--;
@@ -144,6 +147,7 @@
         const ex = p.x + dir.x * s.range, ey = p.y + dir.y * s.range;
         game.addEffect({ type: 'trail', x0: p.x, y0: p.y, x1: ex, y1: ey, life: 0.12, maxLife: 0.12, color: this.color });
         game.addEffect({ type: 'muzzle', x: p.x + dir.x * p.r * 1.2, y: p.y + dir.y * p.r * 1.2, angle: Math.atan2(dir.y, dir.x), life: 0.08, maxLife: 0.08, color: this.color });
+        if (global.SFX) global.SFX.shoot();
         const list = game.enemies.active;
         for (let i = list.length - 1; i >= 0; i--) {
           const en = list[i];
@@ -151,7 +155,7 @@
           const proj = rx * dir.x + ry * dir.y;            // distance along beam
           if (proj < 0 || proj > s.range) continue;
           const perp = Math.abs(rx * dir.y - ry * dir.x);  // perpendicular distance
-          if (perp <= half + en.r) { en.hp -= dmg; en.hitFlash = 0.08; if (en.hp <= 0) game.killEnemy(en); }
+          if (perp <= half + en.r) { en.hp -= dmg; en.hitFlash = 0.08; if (global.Particles) global.Particles.spark(game, en.x, en.y, this.color); if (en.hp <= 0) game.killEnemy(en); }
         }
       }
     },
@@ -221,6 +225,7 @@
         const rr = pr.r + en.r;
         if ((en.x - pr.x) * (en.x - pr.x) + (en.y - pr.y) * (en.y - pr.y) <= rr * rr) {
           en.hp -= pr.damage; en.hitFlash = 0.08;
+          if (global.Particles) global.Particles.spark(game, pr.x, pr.y, pr.color);
           if (en.hp <= 0) game.killEnemy(en);
           if (pr.pierce > 0) pr.pierce--; else dead = true;
         }
@@ -246,6 +251,9 @@
       if (!trip) continue;
       // explode
       game.addEffect({ type: 'ring', x: m.x, y: m.y, r0: 8, r1: m.radius, life: 0.35, maxLife: 0.35, color: '#ff7a5a' });
+      if (global.Particles) global.Particles.burst(game, m.x, m.y, '#ff7a5a', 14, 210);
+      global.Engine.shake(5);
+      if (global.SFX) global.SFX.hit();
       const list = game.enemies.active, rad2 = m.radius * m.radius;
       for (let j = list.length - 1; j >= 0; j--) {
         const en = list[j];

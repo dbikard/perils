@@ -413,8 +413,11 @@
     ctx.fillStyle = '#05070d';
     ctx.fillRect(0, 0, W, H);
 
+    let shx = 0, shy = 0;
+    if (Engine.shakeTime > 0) { shx = (Math.random() - 0.5) * 2 * Engine.shakeMag; shy = (Math.random() - 0.5) * 2 * Engine.shakeMag; }
+
     ctx.save();
-    ctx.translate(W / 2 - cam.x, H / 2 - cam.y); // world space
+    ctx.translate(Math.round(W / 2 - cam.x + shx), Math.round(H / 2 - cam.y + shy)); // world space
     drawMap(ctx, game);
     drawExit(ctx, game);
     drawCrystals(ctx, game);
@@ -426,6 +429,7 @@
     drawOrbiters(ctx, game);
     drawEffectsWorld(ctx, game);
     drawPlayer(ctx, game);
+    if (global.Particles) global.Particles.draw(ctx, game);
     ctx.restore();
 
     // screen space

@@ -86,6 +86,8 @@
     p.invuln = Math.max(p.invuln, p.blink.invuln);
     p.blink.cd = p.blink.cdMax * p.blink.cdMult;
     game.addEffect({ type: 'trail', x0: ox, y0: oy, x1: fx, y1: fy, life: 0.25, maxLife: 0.25, color: '#9af0ff' });
+    if (global.Particles) { global.Particles.puff(game, ox, oy, '#9af0ff', 6); global.Particles.puff(game, fx, fy, '#9af0ff', 6); }
+    if (global.SFX) global.SFX.blink();
     return true;
   }
 
@@ -94,6 +96,8 @@
     if (!p.special || p.special.cd > 0) return false;
     p.special.def.activate(game, p.special);
     p.special.cd = p.special.def.stats(p.special.level).cd;
+    if (global.SFX) global.SFX.special();
+    E.shake(4);
     return true;
   }
 
@@ -111,6 +115,9 @@
     }
     game.addEffect({ type: 'ring', x: p.x, y: p.y, r0: 12, r1: R, life: 0.5, maxLife: 0.5, color: '#ffd166' });
     game.addEffect({ type: 'flash', life: 0.22, maxLife: 0.22, color: '255,209,102' });
+    if (global.Particles) global.Particles.burst(game, p.x, p.y, '#ffd166', 30, 260);
+    if (global.SFX) global.SFX.ult();
+    E.shake(14);
     return true;
   }
 

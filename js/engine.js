@@ -165,8 +165,13 @@
     Engine.input.attach(canvas);
   };
 
-  /* ---------------- Camera ---------------- */
+  /* ---------------- Camera + screen shake ---------------- */
   Engine.camera = { x: 0, y: 0 };
+  Engine.shakeMag = 0; Engine.shakeTime = 0;
+  Engine.shake = function (mag) {
+    Engine.shakeMag = Math.max(Engine.shakeMag, mag);
+    Engine.shakeTime = Math.max(Engine.shakeTime, 0.22);
+  };
   Engine.worldToScreen = (wx, wy) => ({ x: wx - Engine.camera.x + Engine.width / 2, y: wy - Engine.camera.y + Engine.height / 2 });
   Engine.screenToWorld = (sx, sy) => ({ x: sx + Engine.camera.x - Engine.width / 2, y: sy + Engine.camera.y - Engine.height / 2 });
 

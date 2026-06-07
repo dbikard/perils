@@ -120,6 +120,8 @@
         const pos = spawnRing(game);
         spawnEnemy(game, 'boss', pos.x, pos.y);
         if (game.announce) game.announce('⚠ HEAVY UNIT INBOUND', 2.5);
+        if (global.SFX) global.SFX.boss();
+        E.shake(7);
       }
     }
 
