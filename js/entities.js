@@ -30,6 +30,8 @@
       hitFlash: 0,          // seconds of damage flash remaining
       invuln: 0,            // i-frame seconds (Blink)
       facingX: 0, facingY: 1, // last non-zero move direction (for stationary dash)
+      faceLeft: false,      // sprite horizontal flip (billboard)
+      moving: false, animTime: 0, // walk-cycle animation state
       weapons: [],          // [{ def, timer }]
       level: 1, xp: 0, xpNext: 5,
       magnet: 95,           // crystal pickup radius (px)

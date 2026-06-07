@@ -198,64 +198,47 @@
     ctx.closePath();
   }
 
-  // Top-down space fighter. Faces its heading; gains armour plates as p.armor rises
-  // (0 = plain jumpsuit, 1 = helmet+visor, 2 = chest plate, 3 = shoulders, 5 = back plate).
+  // Player = Ace, a pixel-art space fighter drawn billboard-style (upright, flips L/R).
+  // Walk-animates when moving; armour tier swaps the sprite (basic / armored / heavy).
   function drawPlayer(ctx, game) {
-    const p = game.player, r = p.r, armor = p.armor || 0, flash = p.hitFlash > 0;
-    const ang = Math.atan2(p.facingY, p.facingX);
-    const dark = flash ? '#fff' : '#05070d';
-    const TAU = Engine.TAU;
+    const p = game.player, r = p.r, TAU = Engine.TAU, S = global.Sprites;
 
-    // soft glow under the fighter (visibility on dark floors)
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = 'rgba(56,232,255,0.20)';
-    ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.5, 0, TAU); ctx.fill();
-    ctx.restore();
-
+    // drop shadow at the feet
     ctx.save();
-    ctx.translate(p.x, p.y); ctx.rotate(ang);
-
-    // engine exhaust (rear, -x)
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(56,232,255,0.6)';
-    ctx.beginPath(); ctx.ellipse(-r * 1.05, 0, r * 0.55, r * 0.32, 0, 0, TAU); ctx.fill(); ctx.restore();
-
-    // torso (jumpsuit; lightens/metallises with armour)
-    ctx.fillStyle = flash ? '#fff' : (armor >= 4 ? '#ccd6e6' : armor >= 2 ? '#aeb8ca' : '#98a1b6');
-    roundRect(ctx, -r * 0.85, -r * 0.72, r * 1.6, r * 1.44, r * 0.55); ctx.fill();
-    ctx.lineWidth = 2; ctx.strokeStyle = flash ? '#fff' : 'rgba(56,232,255,0.5)'; ctx.stroke();
-
-    // weapon held forward
-    ctx.fillStyle = flash ? '#fff' : '#5a6478'; ctx.fillRect(r * 0.35, r * 0.12, r * 1.05, r * 0.36);
-    ctx.fillStyle = flash ? '#fff' : '#39404f'; ctx.fillRect(r * 1.15, r * 0.16, r * 0.28, r * 0.28);
-
-    // back plate (armour 5+)
-    if (armor >= 5) { ctx.fillStyle = flash ? '#fff' : '#7fd8ff'; roundRect(ctx, -r * 0.82, -r * 0.45, r * 0.4, r * 0.9, r * 0.2); ctx.fill(); }
-    // shoulder pads (armour 3+)
-    if (armor >= 3) {
-      ctx.fillStyle = flash ? '#fff' : '#38e8ff';
-      ctx.beginPath(); ctx.arc(-r * 0.15, -r * 0.78, r * 0.4, 0, TAU); ctx.arc(-r * 0.15, r * 0.78, r * 0.4, 0, TAU); ctx.fill();
-      ctx.lineWidth = 1; ctx.strokeStyle = dark; ctx.stroke();
-    }
-    // chest plate (armour 2+)
-    if (armor >= 2) {
-      ctx.fillStyle = flash ? '#fff' : '#57c2dc';
-      roundRect(ctx, -r * 0.25, -r * 0.5, r * 0.95, r * 1.0, r * 0.3); ctx.fill();
-      ctx.lineWidth = 1.2; ctx.strokeStyle = dark; ctx.stroke();
-    }
-
-    // head / helmet (front, +x)
-    ctx.beginPath(); ctx.arc(r * 0.5, 0, r * 0.5, 0, TAU);
-    ctx.fillStyle = flash ? '#fff' : (armor >= 1 ? '#cdd8e8' : '#e6c79a'); ctx.fill();
-    ctx.lineWidth = 1.5; ctx.strokeStyle = dark; ctx.stroke();
-    if (armor >= 1) { ctx.fillStyle = flash ? '#fff' : '#38e8ff'; ctx.fillRect(r * 0.66, -r * 0.26, r * 0.26, r * 0.52); }
-
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + r * 0.95, r * 0.85, r * 0.38, 0, 0, TAU); ctx.fill();
     ctx.restore();
+
+    let drew = false;
+    if (S && S.ready && S.ace) {
+      const set = S.ace[S.tierFor(p.armor || 0)] || S.ace.basic;
+      const frame = p.moving ? (1 + (Math.floor(p.animTime * 9) % 2)) : 0;
+      const spr = set[frame] || set[0];
+      if (spr) {
+        const scale = (r * 2.8) / spr.h;
+        const sw = spr.w * scale, sh = spr.h * scale;
+        const bob = p.moving ? -Math.abs(Math.sin(p.animTime * 9)) * 2 : 0;
+        const img = p.hitFlash > 0 ? spr.white : spr.img;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.translate(p.x, p.y + bob);
+        if (p.faceLeft) ctx.scale(-1, 1);
+        ctx.drawImage(img, -sw / 2, -sh * 0.62, sw, sh); // anchor feet near p.y
+        ctx.restore();
+        drew = true;
+      }
+    }
+    if (!drew) { // fallback while sprites load
+      ctx.fillStyle = p.hitFlash > 0 ? '#fff' : '#3a5a8f';
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#38e8ff'; ctx.stroke();
+    }
 
     // invulnerability bubble (Blink / Deflector)
     if (p.invuln > 0) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = 'rgba(159,240,255,0.7)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.5, 0, TAU); ctx.stroke(); ctx.restore();
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.6, 0, TAU); ctx.stroke(); ctx.restore();
     }
   }
 

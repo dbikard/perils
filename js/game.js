@@ -166,7 +166,12 @@
     if (p.invuln > 0) p.invuln -= dt;
     if (p.regen > 0 && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + p.regen * dt);
     const mv = E.input.moveVector();
-    if (mv.x !== 0 || mv.y !== 0) { p.facingX = mv.x; p.facingY = mv.y; }
+    p.moving = (mv.x !== 0 || mv.y !== 0);
+    if (p.moving) {
+      p.facingX = mv.x; p.facingY = mv.y;
+      if (mv.x !== 0) p.faceLeft = mv.x < 0;
+      p.animTime += dt;
+    }
     const step = p.speed * p.stats.speedMult * dt;
     const nx = p.x + mv.x * step;
     if (!game.hitsWall(nx, p.y, p.r)) p.x = nx;
@@ -243,6 +248,7 @@
   /* ---------------- boot ---------------- */
   function boot() {
     E.initCanvas(document.getElementById('game'));
+    global.Sprites.load();
     const v = document.querySelector('#menu .version');
     if (v) v.textContent = 'v' + (global.GAME_VERSION || '0.0.0');
     document.getElementById('start-btn').addEventListener('click', startGame);
