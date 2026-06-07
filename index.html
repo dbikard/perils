@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#05070d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Perils">
+  <title>Perils</title>
+  <link rel="stylesheet" href="styles.css?v=0.1.0">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- HUD (screen-space DOM overlay) -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div id="hud-timer">00:00</div>
+      <div id="hud-debug"></div>
+    </div>
+  </div>
+
+  <!-- Level-up choice modal -->
+  <div id="levelup" class="hidden"></div>
+
+  <!-- Start menu -->
+  <div id="menu">
+    <h1>PERILS</h1>
+    <p class="tagline">The ship is lost. Survive until the warp drive charges &mdash; then run.</p>
+    <button id="start-btn">LAUNCH</button>
+    <p class="hint">Move: drag (left) or WASD / arrows &nbsp;·&nbsp; Blink: tap ⟶ or Space &nbsp;·&nbsp; Ultimate: tap ⚡ or E</p>
+    <p class="version"></p>
+  </div>
+
+  <script>const GAME_VERSION = '0.1.0';</script>
+  <script src="js/engine.js?v=0.1.0"></script>
+  <script src="js/mapgen.js?v=0.1.0"></script>
+  <script src="js/render.js?v=0.1.0"></script>
+  <script src="js/entities.js?v=0.1.0"></script>
+  <script src="js/weapons.js?v=0.1.0"></script>
+  <script src="js/abilities.js?v=0.1.0"></script>
+  <script src="js/enemies.js?v=0.1.0"></script>
+  <script src="js/upgrades.js?v=0.1.0"></script>
+  <script src="js/ui.js?v=0.1.0"></script>
+  <script src="js/game.js?v=0.1.0"></script>
+</body>
+</html>

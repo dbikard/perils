@@ -1,0 +1,163 @@
+:root {
+  --bg: #05070d;
+  --neon-cyan: #38e8ff;
+  --neon-green: #54ff9f;
+  --neon-gold: #ffd166;
+  --neon-red: #ff5a6e;
+  --panel: rgba(10, 16, 28, 0.82);
+  --font: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: #e6f0ff;
+  font-family: var(--font);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  background: var(--bg);
+}
+
+.hidden { display: none !important; }
+
+/* ---- HUD ---- */
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+#hud-top {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+#hud-timer {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(56, 232, 255, 0.7);
+}
+#hud-debug {
+  font-size: 11px;
+  color: rgba(180, 210, 255, 0.6);
+  letter-spacing: 0.5px;
+}
+
+/* ---- Start menu ---- */
+#menu {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: radial-gradient(circle at 50% 40%, #0a1326 0%, #05070d 70%);
+  text-align: center;
+  padding: 24px;
+}
+#menu h1 {
+  font-size: clamp(48px, 16vw, 96px);
+  font-weight: 800;
+  letter-spacing: 8px;
+  color: #fff;
+  text-shadow: 0 0 24px var(--neon-cyan), 0 0 60px rgba(56, 232, 255, 0.5);
+}
+#menu .tagline {
+  max-width: 340px;
+  color: #9fb6d8;
+  font-size: 15px;
+  line-height: 1.5;
+}
+#start-btn {
+  margin-top: 8px;
+  padding: 16px 48px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--bg);
+  background: var(--neon-cyan);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 24px rgba(56, 232, 255, 0.6);
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+#start-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 0 36px rgba(56, 232, 255, 0.9);
+}
+#menu .hint {
+  color: #5e77a0;
+  font-size: 12px;
+}
+#menu .version {
+  position: absolute;
+  bottom: 14px;
+  color: #34466a;
+  font-size: 11px;
+}
+
+/* ---- Level-up modal ---- */
+#levelup {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(3, 6, 12, 0.82);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.lvlup-inner { width: 100%; max-width: 460px; text-align: center; }
+.lvlup-head {
+  font-size: 30px; font-weight: 800; letter-spacing: 3px; color: #fff;
+  text-shadow: 0 0 16px var(--neon-cyan);
+}
+.lvlup-sub { color: #9fb6d8; font-size: 14px; margin: 4px 0 18px; letter-spacing: 1px; }
+.lvlup-cards { display: flex; flex-direction: column; gap: 12px; }
+.lvlup-card {
+  display: flex; align-items: center; gap: 14px; text-align: left;
+  padding: 14px 16px; border-radius: 12px; cursor: pointer; width: 100%;
+  background: linear-gradient(180deg, rgba(16, 24, 40, 0.95), rgba(10, 16, 28, 0.95));
+  border: 1px solid var(--c);
+  color: #e6f0ff;
+  transition: transform 0.08s, box-shadow 0.2s;
+}
+.lvlup-card:active { transform: scale(0.98); box-shadow: 0 0 22px -4px var(--c); }
+.lvlup-icon {
+  font-size: 28px; width: 46px; height: 46px; flex: 0 0 46px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--c); background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px; border: 1px solid var(--c);
+}
+.lvlup-text { flex: 1; }
+.lvlup-name { font-size: 17px; font-weight: 700; }
+.lvlup-desc { font-size: 13px; color: #9fb6d8; margin-top: 2px; }
+.lvlup-pips { display: flex; gap: 4px; margin-top: 8px; }
+.lvlup-pips i { width: 14px; height: 5px; border-radius: 2px; background: rgba(255, 255, 255, 0.15); }
+.lvlup-pips i.on { background: var(--c); box-shadow: 0 0 6px var(--c); }
