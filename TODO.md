@@ -1,22 +1,28 @@
 # Perils — TODO
 
-## Phase 0 — Engine + procedural arena  ← IN PROGRESS
-- [ ] `index.html` + `styles.css` scaffold (canvas, mobile layout, neon theme)
-- [ ] `engine.js`: fixed-timestep loop, camera, input (touch joystick + WASD/arrows), spatial hash
-- [ ] `mapgen.js`: procedural ship (rooms + corridors + doors), tile grid, wall collision, validation
-- [ ] flow-field pathfinding (BFS from player over tile grid, periodic recompute)
-- [ ] `render.js`: draw tiles + entities as geometric neon shapes, camera transform
-- [ ] `entities.js`: pooled player / enemy / projectile
-- [ ] Phase 0 playable: one chasing enemy (follows flow field), one auto-fire weapon
-- [ ] **Goal check:** weaving through a generated ship dodging a swarm feels good
+**Live:** https://dbikard.github.io/perils/ · repo: github.com/dbikard/perils · v0.1.0
 
-## Phase 1 — Core loop + abilities
-- [ ] XP crystals drop on kill + magnet pickup
-- [ ] Leveling + level-up modal (pick 1 of 3-4)
-- [ ] HUD (HP, timer, level, XP bar, ult charge)
-- [ ] Blink ability (dash + i-frames)
-- [ ] Ultimate (charge from kills → Orbital Strike)
-- [ ] Game-over screen + restart
+## Phase 0 — Engine + procedural arena  ✅ DONE
+- [x] `index.html` + `styles.css` scaffold (canvas, mobile layout, neon theme)
+- [x] `engine.js`: fixed-timestep loop, camera, input (touch joystick + WASD/arrows), spatial hash
+- [x] `mapgen.js`: procedural ship (rooms + corridors), tile grid, wall collision, validation
+- [x] flow-field pathfinding (BFS from player over tile grid, periodic recompute)
+- [x] `render.js`: draw tiles + entities as geometric neon shapes, camera transform
+- [x] `entities.js`: pooled player / enemy / projectile
+- [x] Phase 0 playable: one chasing enemy (follows flow field), one auto-fire weapon
+
+## Phase 1 — Core loop + abilities  ✅ DONE
+- [x] XP crystals drop on kill + magnet pickup
+- [x] Leveling + level-up modal (pick 1 of 3)
+- [x] HUD (HP, timer, level, XP bar, ult charge ring)
+- [x] Blink ability (dash + i-frames)
+- [x] Ultimate (charge from kills → Orbital Strike)
+- [x] Game-over screen + restart
+- [x] Deployed to GitHub Pages
+
+## To watch / tune (from headless sim)
+- [ ] Early leveling cadence — kiting bots abandon crystals and stay weak; confirm a human collecting feels the power curve. Consider faster first few levels if needed.
+- [ ] Ultimate killing a screen of enemies dumps many crystals → possible burst of stacked level-up modals. Acceptable, but watch the feel.
 
 ## Phase 2 — Content + Special slot (MVP line)
 - [ ] ~6 weapons (Pulse Blaster, Orbiter, Arc Coil, Mine Layer, Scatter Gun, Beam)
