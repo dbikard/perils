@@ -279,7 +279,7 @@
       }
       if (d2 < (p.r + hp.r + 4) * (p.r + hp.r + 4)) {
         p.hp = Math.min(p.maxHp, p.hp + hp.heal);
-        if (global.Particles) global.Particles.sparkle(game, hp.x, hp.y, '#ff5a8a');
+        if (global.Particles) global.Particles.sparkle(game, hp.x, hp.y, '#ff6a78');
         if (global.SFX && global.SFX.pickup) global.SFX.pickup();
         game.pickups.release(hp);
       }

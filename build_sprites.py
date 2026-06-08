@@ -305,6 +305,43 @@ for name, fn in ENEMIES.items():
         to_image(outline(fn(f))).save(os.path.join(OUT_DIR, f'enemy_{name}_{f}.png'))
 print('wrote enemy sprites')
 
+
+# ============================ PICKUPS ============================
+# medical pack — white case with a bold red cross
+C.update({
+    'W': (238, 245, 250), 'Q': (200, 214, 226), 'R': (232, 58, 72),
+    'q': (188, 36, 50), 'J': (120, 140, 160),
+})
+
+
+def draw_pack(frame):  # health pack (~16x14), frame 1 = brighter pulse
+    b = blank(16, 14)
+    glow = frame == 1
+    # case body
+    rect(b, 2, 3, 13, 12, 'W')
+    px(b, 2, 3, None); px(b, 13, 3, None); px(b, 2, 12, None); px(b, 13, 12, None)  # rounded corners
+    rect(b, 3, 3, 12, 3, 'W')
+    # casing shadow / base
+    rect(b, 3, 11, 12, 12, 'Q')
+    px(b, 3, 12, None); px(b, 12, 12, None)
+    # carry handle
+    rect(b, 6, 1, 9, 2, 'J'); rect(b, 7, 2, 8, 2, 'W')
+    # side seam highlight
+    rect(b, 3, 4, 3, 10, 'W')
+    # red cross
+    cr = 'R' if not glow else 'R'
+    rect(b, 7, 5, 8, 10, cr)   # vertical bar
+    rect(b, 5, 7, 10, 8, cr)   # horizontal bar
+    rect(b, 8, 6, 8, 9, 'q'); rect(b, 9, 8, 10, 8, 'q')  # cross shading
+    if glow:
+        px(b, 7, 5, 'i'); px(b, 5, 7, 'i')  # bright glints when pulsing
+    return b
+
+
+for f in (0, 1):
+    to_image(outline(draw_pack(f))).save(os.path.join(OUT_DIR, f'pickup_heal_{f}.png'))
+print('wrote pickup sprites')
+
 # enemy preview sheet
 cols = list(ENEMIES.items())
 maxw = max(len(fn(0)[0]) for _, fn in cols)
