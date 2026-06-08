@@ -7,7 +7,7 @@
     phase: 'MENU',          // MENU | PLAYING | GAME_OVER (ESCAPE/VICTORY in Phase 2)
     map: null, ff: null, rng: null,
     player: null,
-    enemies: null, projectiles: null, crystals: null,
+    enemies: null, projectiles: null, crystals: null, pickups: null,
     enemyHash: null,
     timeSec: 0,
     spawnTimer: 0,
@@ -45,6 +45,12 @@
     // drop an XP crystal
     const c = game.crystals.spawn();
     c.x = e.x; c.y = e.y; c.r = 5; c.value = 1;
+    // occasionally drop a healing pack — bosses always, others rarely
+    if (e.boss || game.rng() < 0.025) {
+      const hp = game.pickups.spawn();
+      hp.x = e.x; hp.y = e.y; hp.r = 9; hp.kind = 'heal';
+      hp.heal = e.boss ? 45 : 25; hp.life = 18;
+    }
     game.enemies.release(e);
   };
 
@@ -77,6 +83,7 @@
     game.enemyProjectiles = new global.Entities.Pool(global.Entities.newEnemyProjectile);
     game.mines = new global.Entities.Pool(global.Entities.newMine);
     game.crystals = new global.Entities.Pool(global.Entities.newCrystal);
+    game.pickups = new global.Entities.Pool(global.Entities.newPickup);
     game.enemyHash = new E.SpatialHash(56);
     game.sentries = [];
 
@@ -208,6 +215,7 @@
 
     // crystal magnet/pickup → leveling
     updateCrystals(game, dt);
+    updatePickups(game, dt);
     if (game.pendingLevels > 0) { if (global.SFX) global.SFX.level(); global.UI.openLevelUp(game); }
 
     // age visual effects + particles + screen shake
@@ -251,6 +259,29 @@
           game.pendingLevels++;
         }
         game.crystals.release(c);
+      }
+    }
+  }
+
+  // healing packs: gently drawn in by the magnet, expire over time; restore HP on pickup
+  function updatePickups(game, dt) {
+    const p = game.player, list = game.pickups.active;
+    const mag2 = p.magnet * p.magnet;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const hp = list[i];
+      hp.life -= dt;
+      if (hp.life <= 0) { game.pickups.release(hp); continue; }
+      const dx = p.x - hp.x, dy = p.y - hp.y, d2 = dx * dx + dy * dy;
+      if (d2 < mag2) {
+        const d = Math.sqrt(d2) || 1;
+        const pull = 120 + (1 - d / p.magnet) * 180;
+        hp.x += dx / d * pull * dt; hp.y += dy / d * pull * dt;
+      }
+      if (d2 < (p.r + hp.r + 4) * (p.r + hp.r + 4)) {
+        p.hp = Math.min(p.maxHp, p.hp + hp.heal);
+        if (global.Particles) global.Particles.sparkle(game, hp.x, hp.y, '#ff5a8a');
+        if (global.SFX && global.SFX.pickup) global.SFX.pickup();
+        game.pickups.release(hp);
       }
     }
   }

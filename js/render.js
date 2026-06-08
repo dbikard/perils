@@ -83,6 +83,38 @@
     ctx.restore();
   }
 
+  function drawPickups(ctx, game) {
+    const list = game.pickups ? game.pickups.active : null;
+    if (!list || !list.length) return;
+    const t = game.timeSec;
+    for (let i = 0; i < list.length; i++) {
+      const hp = list[i];
+      const pulse = 0.5 + 0.5 * Math.sin(t * 5 + hp.x * 0.05);
+      const blink = hp.life < 4 ? (Math.sin(t * 16) > 0 ? 0.3 : 1) : 1; // flash before expiring
+      ctx.save();
+      ctx.globalAlpha = blink;
+      // glow
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,90,138,${0.18 + 0.12 * pulse})`;
+      ctx.beginPath(); ctx.arc(hp.x, hp.y, hp.r + 6 + 3 * pulse, 0, Engine.TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      // capsule body
+      ctx.fillStyle = '#1a1014';
+      ctx.strokeStyle = '#ff5a8a';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(hp.x, hp.y, hp.r, 0, Engine.TAU); ctx.fill(); ctx.stroke();
+      // cross
+      ctx.strokeStyle = '#ff8aae';
+      ctx.lineWidth = 2.4;
+      const a = hp.r * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(hp.x - a, hp.y); ctx.lineTo(hp.x + a, hp.y);
+      ctx.moveTo(hp.x, hp.y - a); ctx.lineTo(hp.x, hp.y + a);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function pathShape(ctx, shape, x, y, r) {
     ctx.beginPath();
     if (shape === 'tri') {
@@ -421,6 +453,7 @@
     drawMap(ctx, game);
     drawExit(ctx, game);
     drawCrystals(ctx, game);
+    drawPickups(ctx, game);
     drawMines(ctx, game);
     drawProjectiles(ctx, game);
     drawEnemyProjectiles(ctx, game);
