@@ -66,7 +66,10 @@
   function newCrystal() {
     return { x: 0, y: 0, r: 5, value: 1, _active: false, _idx: -1 };
   }
+  function newPickup() {
+    return { x: 0, y: 0, r: 9, kind: 'heal', heal: 25, life: 18, _active: false, _idx: -1 };
+  }
 
-  global.Entities = { Pool, createPlayer, newEnemy, newProjectile, newEnemyProjectile, newMine, newCrystal };
+  global.Entities = { Pool, createPlayer, newEnemy, newProjectile, newEnemyProjectile, newMine, newCrystal, newPickup };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.Entities;
 })(typeof window !== 'undefined' ? window : globalThis);

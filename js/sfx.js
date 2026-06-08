@@ -56,6 +56,7 @@
   SFX.hit = function () { if (!ok('hit', 0.03)) return; tone(440, 0.04, 'square', 0.06, 300); };
   SFX.hurt = function () { if (!ok('hurt', 0.3)) return; tone(150, 0.18, 'sawtooth', 0.16, 70); };
   SFX.level = function () { if (!ok('level', 0.1)) return; tone(523, 0.12, 'square', 0.16); tone(784, 0.16, 'square', 0.14, null, ctx.currentTime + 0.09); };
+  SFX.pickup = function () { if (!ok('pickup', 0.08)) return; tone(660, 0.09, 'sine', 0.14, 990); tone(990, 0.12, 'sine', 0.1, null, ctx.currentTime + 0.07); };
   SFX.blink = function () { if (!ok('blink', 0.05)) return; noise(0.12, 0.1, 'bandpass', 1400); tone(900, 0.1, 'sine', 0.06, 1700); };
   SFX.special = function () { if (!ok('special', 0.05)) return; tone(300, 0.2, 'sawtooth', 0.14, 1300); };
   SFX.ult = function () { if (!ok('ult', 0.1)) return; noise(0.45, 0.28, 'lowpass', 700); tone(120, 0.5, 'sawtooth', 0.2, 40); };

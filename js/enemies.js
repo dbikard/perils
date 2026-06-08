@@ -127,8 +127,8 @@
 
     game.spawnTimer -= dt;
     if (game.spawnTimer > 0) return;
-    let interval = Math.max(0.16, 1.0 - t * 0.012);
-    let batch = 1 + Math.floor(t / 25);
+    let interval = Math.max(0.2, 1.1 - t * 0.011);
+    let batch = 1 + Math.floor(t / 30);
     if (escaping) { interval *= 0.55; batch = Math.ceil(batch * 1.6); }
     game.spawnTimer += interval;
     if (game.enemies.count >= MAX) return;

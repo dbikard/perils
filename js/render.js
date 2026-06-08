@@ -83,6 +83,48 @@
     ctx.restore();
   }
 
+  function drawPickups(ctx, game) {
+    const list = game.pickups ? game.pickups.active : null;
+    if (!list || !list.length) return;
+    const t = game.timeSec, S = global.Sprites;
+    const pk = (S && S.ready && S.pack) ? S.pack : null;
+    for (let i = 0; i < list.length; i++) {
+      const hp = list[i];
+      const pulse = 0.5 + 0.5 * Math.sin(t * 5 + hp.x * 0.05);
+      const bob = Math.sin(t * 3 + hp.x * 0.07) * 1.5;
+      const blink = hp.life < 4 ? (Math.sin(t * 16) > 0 ? 0.3 : 1) : 1; // flash before expiring
+      ctx.save();
+      ctx.globalAlpha = blink;
+      // red medical glow
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(232,58,72,${0.16 + 0.14 * pulse})`;
+      ctx.beginPath(); ctx.arc(hp.x, hp.y + bob, hp.r + 6 + 3 * pulse, 0, Engine.TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+
+      const frame = pulse > 0.6 ? 1 : 0;
+      const spr = pk && pk[frame];
+      if (spr && spr.img) {
+        const scale = (hp.r * 2.4) / spr.w;
+        const w = spr.w * scale, h = spr.h * scale;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(spr.img, hp.x - w / 2, hp.y + bob - h / 2, w, h);
+      } else {
+        // procedural fallback: white case + red cross
+        ctx.fillStyle = '#eef5fa';
+        ctx.strokeStyle = '#0a0d18'; ctx.lineWidth = 1.5;
+        const s = hp.r;
+        ctx.beginPath(); ctx.rect(hp.x - s, hp.y + bob - s * 0.8, s * 2, s * 1.6); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#e83a48'; ctx.lineWidth = 2.6;
+        const a = s * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(hp.x - a, hp.y + bob); ctx.lineTo(hp.x + a, hp.y + bob);
+        ctx.moveTo(hp.x, hp.y + bob - a); ctx.lineTo(hp.x, hp.y + bob + a);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   function pathShape(ctx, shape, x, y, r) {
     ctx.beginPath();
     if (shape === 'tri') {
@@ -421,6 +463,7 @@
     drawMap(ctx, game);
     drawExit(ctx, game);
     drawCrystals(ctx, game);
+    drawPickups(ctx, game);
     drawMines(ctx, game);
     drawProjectiles(ctx, game);
     drawEnemyProjectiles(ctx, game);
