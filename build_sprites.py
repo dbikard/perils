@@ -296,9 +296,66 @@ def draw_boss(frame):  # hulking red war-mech beast (~46x40)
     return b
 
 
+def draw_wraith(frame):  # spectral stalker (~20x24) — translucent in-game
+    b = blank(20, 24)
+    sway = 0 if frame == 0 else 1
+    # trailing wisps (tattered hem, alternate frames)
+    for i, wx in enumerate((4, 8, 12)):
+        top = 17 + ((i + sway) % 2)
+        rect(b, wx, top, wx + 2, top + 3, 'p')
+        px(b, wx + 1, top + 4, 'x')
+    # shroud body, tapering down
+    rect(b, 4, 8, 15, 17, 'p'); rect(b, 5, 8, 14, 15, 'u')
+    rect(b, 6, 8, 13, 11, 'U')                  # inner glow upper
+    # cowl / head dome
+    rect(b, 5, 2, 14, 9, 'p'); rect(b, 6, 3, 13, 8, 'u')
+    px(b, 5, 2, None); px(b, 14, 2, None)
+    # void face + glowing eyes
+    rect(b, 7, 4, 12, 7, 'x')
+    px(b, 8, 5, 'i'); px(b, 11, 5, 'i')
+    if frame == 1:
+        px(b, 8, 6, 'U'); px(b, 11, 6, 'U')     # eye flare
+    # reaching claw (right, toward player)
+    rect(b, 14, 10 + sway, 17, 11 + sway, 'u'); px(b, 18, 11 + sway, 'U')
+    return b
+
+
+# crew survivor NPC — cyan-suited astronaut, waving when waiting
+def draw_crew(frame):  # ~18x28
+    b = blank(18, 28)
+    wave = frame == 1
+    # legs
+    rect(b, 6, 19, 8, 24, 't'); rect(b, 10, 19, 12, 24, 'T')
+    rect(b, 5, 24, 8, 25, 'l'); rect(b, 10, 24, 13, 25, 'l')   # boots
+    # torso suit
+    rect(b, 5, 10, 13, 19, 'T'); rect(b, 6, 11, 12, 17, 't')
+    rect(b, 7, 12, 11, 14, 'v')                                 # chest panel
+    px(b, 9, 13, 'V')                                            # status light
+    rect(b, 5, 17, 13, 18, 'l')                                  # belt
+    # left arm (always down)
+    rect(b, 3, 11, 5, 17, 'T'); rect(b, 3, 17, 4, 18, 'k')
+    # right arm: waving for help vs down
+    if wave:
+        rect(b, 13, 5, 15, 11, 'T'); rect(b, 14, 3, 15, 5, 'k')  # raised + hand
+    else:
+        rect(b, 13, 11, 15, 17, 'T'); rect(b, 14, 17, 15, 18, 'k')
+    # helmet
+    rect(b, 5, 1, 13, 9, 'T'); rect(b, 6, 2, 12, 8, 't')
+    px(b, 5, 1, None); px(b, 13, 1, None)
+    rect(b, 7, 3, 12, 6, 'v'); rect(b, 8, 4, 10, 5, 'V')         # visor + face glint
+    px(b, 9, 4, 'k'); px(b, 10, 4, 'k')                          # face behind visor
+    return b
+
+
+C.update({
+    # wraith purples + crew teals
+    'u': (150, 96, 210), 'U': (208, 168, 255), 'x': (44, 22, 66),
+    't': (52, 120, 160), 'T': (30, 80, 116),
+})
+
 ENEMIES = {
     'swarmer': draw_swarmer, 'sprinter': draw_sprinter, 'spitter': draw_spitter,
-    'hulk': draw_hulk, 'boss': draw_boss,
+    'hulk': draw_hulk, 'boss': draw_boss, 'wraith': draw_wraith,
 }
 for name, fn in ENEMIES.items():
     for f in (0, 1):
@@ -341,6 +398,10 @@ def draw_pack(frame):  # health pack (~16x14), frame 1 = brighter pulse
 for f in (0, 1):
     to_image(outline(draw_pack(f))).save(os.path.join(OUT_DIR, f'pickup_heal_{f}.png'))
 print('wrote pickup sprites')
+
+for f in (0, 1):
+    to_image(outline(draw_crew(f))).save(os.path.join(OUT_DIR, f'crew_{f}.png'))
+print('wrote crew sprites')
 
 # enemy preview sheet
 cols = list(ENEMIES.items())

@@ -12,9 +12,9 @@
     // wraith (Helios Station): phases straight through bulkheads — corridors
     // are not cover against it, and weapons can't target it behind walls
     wraith:   { r: 11, hp: 30,  speed: 64,  damage: 11, xp: 3, color: '#c48eff', shape: 'circle', ghost: true },
-    // boss: collision radius must fit the 2-tile (64px) corridors; drawn larger.
-    // Its mortar slams arc over walls — cover blocks bullets, not the barrage.
-    boss:     { r: 26, hp: 700, speed: 44, damage: 24, xp: 30, color: '#ff3b5e', shape: 'square', boss: true,
+    // boss: collision body is player-sized (r13) so it navigates anything the
+    // player can; drawn 2.5x bigger. Mortar slams arc over walls.
+    boss:     { r: 13, hp: 700, speed: 44, damage: 24, xp: 30, color: '#ff3b5e', shape: 'square', boss: true,
                 slamCd: 3.2, slamRange: 520, slamRadius: 70, slamDmg: 20 }
   };
 
@@ -104,16 +104,35 @@
           let dir = ff.dirAtTile(tx, ty), dx = dir.x, dy = dir.y;
           if (dx === 0 && dy === 0) { dx = p.x - e.x; dy = p.y - e.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l; }
           let vx = dx * e.speed * slow, vy = dy * e.speed * slow;
-          // light separation
-          let sx = 0, sy = 0;
-          game.enemyHash.queryCircle(e.x, e.y, e.r * 2.4, (o) => {
-            if (o === e || !o._active) return;
-            const ox = e.x - o.x, oy = e.y - o.y, dd = ox * ox + oy * oy, rr = e.r + o.r;
-            if (dd > 0 && dd < rr * rr) { const d = Math.sqrt(dd); sx += ox / d; sy += oy / d; }
-          });
-          vx += sx * e.speed * 0.5; vy += sy * e.speed * 0.5;
-          const nx = e.x + vx * dt; if (!game.hitsWall(nx, e.y, e.r)) e.x = nx;
-          const ny = e.y + vy * dt; if (!game.hitsWall(e.x, ny, e.r)) e.y = ny;
+          if (e.boss) {
+            // bosses bulldoze: no flock separation, so the swarm can't pin them
+          } else {
+            // light separation
+            let sx = 0, sy = 0;
+            game.enemyHash.queryCircle(e.x, e.y, e.r * 2.4, (o) => {
+              if (o === e || !o._active) return;
+              const ox = e.x - o.x, oy = e.y - o.y, dd = ox * ox + oy * oy, rr = e.r + o.r;
+              if (dd > 0 && dd < rr * rr) { const d = Math.sqrt(dd); sx += ox / d; sy += oy / d; }
+            });
+            vx += sx * e.speed * 0.5; vy += sy * e.speed * 0.5;
+          }
+          // per-axis move with corner-slide assist: when an axis is blocked by
+          // a wall corner and there is no perpendicular velocity to slide with,
+          // nudge toward the open half of the tile (prevents permanent jams)
+          const nx = e.x + vx * dt;
+          if (!game.hitsWall(nx, e.y, e.r)) e.x = nx;
+          else if (Math.abs(vy) < 1) {
+            const sgn = ((e.y / map.tile) % 1) < 0.5 ? 1 : -1;
+            const ay = e.y + sgn * e.speed * slow * 0.7 * dt;
+            if (!game.hitsWall(e.x, ay, e.r)) e.y = ay;
+          }
+          const ny = e.y + vy * dt;
+          if (!game.hitsWall(e.x, ny, e.r)) e.y = ny;
+          else if (Math.abs(vx) < 1) {
+            const sgn = ((e.x / map.tile) % 1) < 0.5 ? 1 : -1;
+            const ax = e.x + sgn * e.speed * slow * 0.7 * dt;
+            if (!game.hitsWall(ax, e.y, e.r)) e.x = ax;
+          }
         }
       }
 
