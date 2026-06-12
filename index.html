@@ -33,7 +33,12 @@
     <img id="portrait" src="sprites/ace_portrait.png?v=0.5.1" alt="Ace">
     <h1>PERILS</h1>
     <p class="tagline">The ship is lost. Survive until the warp drive charges &mdash; then run.</p>
+    <div id="stage-select">
+      <button class="stage-btn selected" data-stage="1">I · THE VESSEL</button>
+      <button class="stage-btn locked" data-stage="2">II · HELIOS STATION</button>
+    </div>
     <button id="start-btn">LAUNCH</button>
+    <p id="menu-stats"></p>
     <p class="hint">Move: drag (left) or WASD / arrows &nbsp;·&nbsp; Blink: ⟶ / Space &nbsp;·&nbsp; Special: Q &nbsp;·&nbsp; Ultimate: ⚡ / E</p>
     <p class="version"></p>
   </div>
@@ -50,6 +55,7 @@
   <script src="js/abilities.js?v=0.5.1"></script>
   <script src="js/enemies.js?v=0.5.1"></script>
   <script src="js/upgrades.js?v=0.5.1"></script>
+  <script src="js/meta.js?v=0.5.1"></script>
   <script src="js/ui.js?v=0.5.1"></script>
   <script src="js/game.js?v=0.5.1"></script>
 </body>

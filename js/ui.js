@@ -55,6 +55,35 @@
       btn.addEventListener('click', () => UI.pick(game, parseInt(btn.dataset.i, 10))));
   };
 
+  /* ---- weapon cache modal (found on the map) ---- */
+  UI.openCache = function (game, choices) {
+    E.paused = true;
+    E.input.joyActive = false;
+    const cont = document.getElementById('levelup');
+    let html = `<div class="lvlup-inner"><div class="lvlup-head">WEAPON CACHE</div>`
+      + `<div class="lvlup-sub">Choose an armament</div><div class="lvlup-cards">`;
+    choices.forEach((c, i) => {
+      html += `<button class="lvlup-card" data-i="${i}" style="--c:${c.color}">`
+        + `<div class="lvlup-icon">${c.icon}</div>`
+        + `<div class="lvlup-text">`
+        + `<div class="lvlup-tag">${c.tag || ''}</div>`
+        + `<div class="lvlup-name">${c.name}</div>`
+        + `<div class="lvlup-desc">${c.desc}</div>`
+        + `<div class="lvlup-pips">${pips(c.level, c.max)}</div>`
+        + `</div></button>`;
+    });
+    html += `</div></div>`;
+    cont.innerHTML = html;
+    cont.classList.remove('hidden');
+    cont.querySelectorAll('.lvlup-card').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const c = choices[parseInt(btn.dataset.i, 10)];
+        if (c) global.Upgrades.applyChoice(game, c);
+        cont.classList.add('hidden');
+        E.paused = false;
+      }));
+  };
+
   UI.pick = function (game, i) {
     const choice = game._choices[i];
     if (choice) global.Upgrades.applyChoice(game, choice);

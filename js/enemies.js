@@ -9,6 +9,9 @@
     hulk:     { r: 18, hp: 78,  speed: 38,  damage: 16, xp: 4, color: '#c0466e', shape: 'square' },
     spitter:  { r: 11, hp: 20,  speed: 50,  damage: 5,  xp: 2, color: '#ffb347', shape: 'diamond',
                 ranged: true, fireRange: 340, fireCd: 2.4, projSpeed: 210, projDmg: 9 },
+    // wraith (Helios Station): phases straight through bulkheads — corridors
+    // are not cover against it, and weapons can't target it behind walls
+    wraith:   { r: 11, hp: 30,  speed: 64,  damage: 11, xp: 3, color: '#c48eff', shape: 'circle', ghost: true },
     // boss: collision radius must fit the 2-tile (64px) corridors; drawn larger.
     // Its mortar slams arc over walls — cover blocks bullets, not the barrage.
     boss:     { r: 26, hp: 700, speed: 44, damage: 24, xp: 30, color: '#ff3b5e', shape: 'square', boss: true,
@@ -21,7 +24,8 @@
     // gentle linear HP growth, then a quadratic late-game wall (a maxed build
     // should still feel hunted at minute 5 — threat must outpace power slightly)
     const t = game.timeSec;
-    const hpScale = 1 + t * 0.007 + Math.max(0, t - 150) * Math.max(0, t - 150) * 0.0001;
+    const hpScale = (1 + t * 0.007 + Math.max(0, t - 150) * Math.max(0, t - 150) * 0.0003)
+      * ((game.stageDef && game.stageDef.hpMult) || 1);
     const dmgScale = 1 + game.timeSec * 0.003;
     e.type = typeId; e.x = x; e.y = y; e.r = def.r;
     e.maxHp = def.hp * hpScale; e.hp = e.maxHp;
@@ -32,6 +36,7 @@
     e.fireTimer = def.fireCd ? def.fireCd * 0.5 : 0;
     e.projSpeed = def.projSpeed || 0; e.projDmg = (def.projDmg || 0) * dmgScale;
     e.boss = !!def.boss;
+    e.ghost = !!def.ghost;
     if (def.boss) {
       e.slamCd = def.slamCd; e.slamRange = def.slamRange; e.slamRadius = def.slamRadius;
       e.slamDmg = def.slamDmg * dmgScale;
@@ -73,7 +78,12 @@
             if (e.fireTimer <= 0) { e.fireTimer = e.fireCd; fireEnemyProjectile(game, e, dx, dy); }
           }
         }
-        if (!hold) {
+        if (!hold && e.ghost) {
+          // wraiths drift straight at the player, walls be damned
+          const dx = p.x - e.x, dy = p.y - e.y, l = Math.hypot(dx, dy) || 1;
+          e.x += dx / l * e.speed * slow * dt;
+          e.y += dy / l * e.speed * slow * dt;
+        } else if (!hold) {
           const tx = Math.floor(e.x / map.tile), ty = Math.floor(e.y / map.tile);
           let dir = ff.dirAtTile(tx, ty), dx = dir.x, dy = dir.y;
           if (dx === 0 && dy === 0) { dx = p.x - e.x; dy = p.y - e.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l; }
@@ -145,6 +155,7 @@
 
   function pickType(game) {
     const t = game.timeSec, r = game.rng();
+    if (game.stageDef && game.stageDef.wraiths && t > 45 && r < 0.22) return 'wraith';
     if (t > 240) { // late mix punishes pure kiting: ranged + fast dominate
       if (r < 0.15) return 'hulk';
       if (r < 0.50) return 'spitter';
@@ -185,11 +196,12 @@
     // pressure/release: ramping spawn rate with a surge at the top of each
     // minute and a lull at the end (breathe, collect XP) — flow theory.
     // enemies/sec: shallow ramp through the midgame, sharp ramp after 3min
-    let rate = 0.85 + t * 0.009 + Math.max(0, t - 180) * 0.022; // 0.85 → ~2.5 @3min → ~6.2 @5min
+    let rate = 0.85 + t * 0.010 + Math.max(0, t - 180) * 0.022; // 0.85 → ~2.7 @3min → ~6.5 @5min
     const phase = t % 60;
     if (phase >= 48) rate *= 0.35;           // lull
     else if (t > 60 && phase < 8) rate *= 1.4; // surge
     if (escaping) rate *= 2.5;               // the escape is the hardest moment by design
+    rate *= (game.stageDef && game.stageDef.rateMult) || 1;
     const batch = 1 + Math.floor(t / 75);
     game.spawnTimer += batch / rate;
     if (game.enemies.count >= MAX) return;

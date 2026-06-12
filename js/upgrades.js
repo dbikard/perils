@@ -61,12 +61,25 @@
       desc: u.desc, tag: u.tag, level: levelOf(game, u.id), max: u.max, apply: u.apply };
   }
 
+  // new weapons are FOUND in caches on the map (exploration incentive) —
+  // the level-up pool only deepens what you already carry
+  function generateWeaponChoices(game, n) {
+    const p = game.player;
+    if (p.weapons.length >= WEAPON_CAP) return [];
+    const owned = new Set(p.weapons.map(w => w.id));
+    const pool = [];
+    for (const id in global.WEAPONS) if (!owned.has(id)) pool.push(weaponAcquireChoice(id));
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(game.rng() * (i + 1));
+      const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    return pool.slice(0, n);
+  }
+
   function generateChoices(game, n) {
     const p = game.player, pool = [];
-    const owned = new Set(p.weapons.map(w => w.id));
 
     for (const w of p.weapons) if (w.level < w.def.maxLevel) pool.push(weaponUpgradeChoice(w));
-    if (p.weapons.length < WEAPON_CAP) for (const id in global.WEAPONS) if (!owned.has(id)) pool.push(weaponAcquireChoice(id));
 
     if (!p.special) { for (const id in global.SPECIALS) pool.push(specialAcquireChoice(id)); }
     else if (p.special.level < p.special.def.maxLevel) pool.push(specialUpgradeChoice(p.special));
@@ -91,6 +104,6 @@
     }
   }
 
-  global.Upgrades = { PASSIVES, generateChoices, applyChoice, levelOf };
+  global.Upgrades = { PASSIVES, generateChoices, generateWeaponChoices, applyChoice, levelOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.Upgrades;
 })(typeof window !== 'undefined' ? window : globalThis);
