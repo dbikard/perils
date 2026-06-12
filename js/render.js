@@ -153,7 +153,7 @@
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       // bosses collide small (to fit corridors) but draw large (to read as bosses)
-      const vr = e.boss ? e.r * 1.3 : e.r;
+      const vr = e.boss ? e.r * 2.5 : e.r;
       const set = (S && S.ready && S.enemy) ? S.enemy[e.type] : null;
       let drew = false;
       if (set) {
@@ -165,6 +165,7 @@
           const img = e.hitFlash > 0 ? spr.white : spr.img;
           ctx.save();
           ctx.imageSmoothingEnabled = false;
+          if (e.ghost) ctx.globalAlpha = 0.55 + 0.2 * Math.sin(t * 5 + e.x * 0.04); // spectral shimmer
           ctx.translate(e.x, e.y);
           if (px < e.x) ctx.scale(-1, 1); // face the player
           ctx.drawImage(img, -sw / 2, -sh * 0.55, sw, sh);
@@ -264,12 +265,27 @@
         ctx.beginPath(); ctx.arc(s.x, s.y, 14 + ping * 30, 0, Engine.TAU); ctx.stroke();
         ctx.restore();
       }
-      ctx.fillStyle = '#10324a';
-      ctx.strokeStyle = '#7fd8ff'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Engine.TAU); ctx.fill(); ctx.stroke();
+      const S = global.Sprites;
+      const set = (S && S.ready && S.crew && S.crew.length) ? S.crew : null;
+      const frame = s.state === 'waiting' ? (Math.floor(t * 2.5) % 2)          // waving for help
+        : (Math.floor(t * 5 + s.x * 0.05) % 2);                                // jogging along
+      const spr = set && (set[frame] || set[0]);
+      if (spr && spr.img) {
+        const scale = (s.r * 2.6) / spr.h;
+        const sw = spr.w * scale, sh = spr.h * scale;
+        const bob = s.state === 'following' ? -Math.abs(Math.sin(t * 9 + s.x * 0.1)) * 2 : 0;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(spr.img, s.x - sw / 2, s.y + bob - sh * 0.62, sw, sh);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#10324a';
+        ctx.strokeStyle = '#7fd8ff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Engine.TAU); ctx.fill(); ctx.stroke();
+      }
       ctx.fillStyle = '#7fd8ff';
       ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(s.state === 'waiting' ? 'SOS' : s.name.split(' ').pop(), s.x, s.y - s.r - 6);
+      ctx.fillText(s.state === 'waiting' ? 'SOS' : s.name.split(' ').pop(), s.x, s.y - s.r - 14);
       ctx.textAlign = 'start';
       if (s.state === 'following' && s.hp < s.maxHp) {
         const w = s.r * 2, frac = Math.max(0, s.hp / s.maxHp);
