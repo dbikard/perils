@@ -9,7 +9,10 @@
     hulk:     { r: 18, hp: 78,  speed: 38,  damage: 16, xp: 4, color: '#c0466e', shape: 'square' },
     spitter:  { r: 11, hp: 20,  speed: 50,  damage: 5,  xp: 2, color: '#ffb347', shape: 'diamond',
                 ranged: true, fireRange: 340, fireCd: 2.4, projSpeed: 210, projDmg: 9 },
-    boss:     { r: 34, hp: 700, speed: 44, damage: 24, xp: 30, color: '#ff3b5e', shape: 'square', boss: true }
+    // boss: collision radius must fit the 2-tile (64px) corridors; drawn larger.
+    // Its mortar slams arc over walls — cover blocks bullets, not the barrage.
+    boss:     { r: 26, hp: 700, speed: 44, damage: 24, xp: 30, color: '#ff3b5e', shape: 'square', boss: true,
+                slamCd: 3.2, slamRange: 520, slamRadius: 70, slamDmg: 20 }
   };
 
   function spawnEnemy(game, typeId, x, y, elite) {
@@ -29,6 +32,11 @@
     e.fireTimer = def.fireCd ? def.fireCd * 0.5 : 0;
     e.projSpeed = def.projSpeed || 0; e.projDmg = (def.projDmg || 0) * dmgScale;
     e.boss = !!def.boss;
+    if (def.boss) {
+      e.slamCd = def.slamCd; e.slamRange = def.slamRange; e.slamRadius = def.slamRadius;
+      e.slamDmg = def.slamDmg * dmgScale;
+      e.slamTimer = 2.5; // grace period after the spawn warning
+    }
     e.elite = false; e.xpValue = def.xp || 1;
     if (elite) {
       // elite: tanky, faster, juicy bounty — worth diving into the swarm for
@@ -83,11 +91,41 @@
         }
       }
 
+      // boss mortar: lob a slam at the player's position — no line of sight
+      // needed, so hiding behind walls (or camping the airlock) stays dangerous
+      if (e.boss && e.stun <= 0) {
+        e.slamTimer -= dt;
+        const dxp = p.x - e.x, dyp = p.y - e.y;
+        if (e.slamTimer <= 0 && dxp * dxp + dyp * dyp < e.slamRange * e.slamRange) {
+          e.slamTimer = e.slamCd;
+          game.slams.push({ x: p.x, y: p.y, t: 0, delay: 1.2, radius: e.slamRadius, damage: e.slamDmg });
+          game.addEffect({ type: 'ring', x: e.x, y: e.y, r0: e.r, r1: e.r + 26, life: 0.3, maxLife: 0.3, color: '#ff3b5e' });
+          if (global.SFX) global.SFX.shoot();
+        }
+      }
+
       // contact damage
       const pr = e.r + p.r;
       if ((e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y) < pr * pr) {
         game.damagePlayer(e.damage * dt);
       }
+    }
+  }
+
+  // telegraphed boss mortar blasts: detonate after the delay, walls don't help
+  function updateSlams(game, dt) {
+    const list = game.slams, p = game.player;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const s = list[i];
+      s.t += dt;
+      if (s.t < s.delay) continue;
+      const rr = s.radius + p.r * 0.5;
+      if ((p.x - s.x) * (p.x - s.x) + (p.y - s.y) * (p.y - s.y) < rr * rr) game.damagePlayer(s.damage);
+      game.addEffect({ type: 'ring', x: s.x, y: s.y, r0: 12, r1: s.radius, life: 0.32, maxLife: 0.32, color: '#ff3b5e' });
+      if (global.Particles) global.Particles.burst(game, s.x, s.y, '#ff3b5e', 12, 200);
+      if (global.SFX) global.SFX.hit();
+      E.shake(4);
+      list.splice(i, 1);
     }
   }
 
@@ -177,6 +215,6 @@
   }
 
   global.ENEMY_TYPES = ENEMY_TYPES;
-  global.Enemies = { ENEMY_TYPES, spawnEnemy, updateMovement, updateEnemyProjectiles, updateSpawning, burst };
+  global.Enemies = { ENEMY_TYPES, spawnEnemy, updateMovement, updateEnemyProjectiles, updateSpawning, updateSlams, burst };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.Enemies;
 })(typeof window !== 'undefined' ? window : globalThis);

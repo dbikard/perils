@@ -108,7 +108,7 @@
 
     game.timeSec = 0; game.spawnTimer = 0.5; game.ffTimer = 0; game.kills = 0;
     game.warp = 0; game.bossTimer = 150; game.enemySlow = 0; game.banner = null;
-    game.exitHold = 0;
+    game.exitHold = 0; game.slams = [];
     game.effects = [];
     game.particles = [];
     if (global.SFX) { global.SFX.init(); global.SFX.resume(); }
@@ -232,6 +232,7 @@
     // enemies
     global.Enemies.updateMovement(game, dt);
     global.Enemies.updateEnemyProjectiles(game, dt);
+    global.Enemies.updateSlams(game, dt);
     global.Enemies.updateSpawning(game, dt);
 
     // escape: hold the airlock pad while it cycles — the final stand

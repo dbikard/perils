@@ -151,13 +151,15 @@
     const list = game.enemies.active, S = global.Sprites, t = game.timeSec, px = game.player.x;
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
+      // bosses collide small (to fit corridors) but draw large (to read as bosses)
+      const vr = e.boss ? e.r * 1.3 : e.r;
       const set = (S && S.ready && S.enemy) ? S.enemy[e.type] : null;
       let drew = false;
       if (set) {
         const frame = (((Math.floor(t * 5 + e.x * 0.05)) % 2) + 2) % 2; // 2-frame, phased by position
         const spr = set[frame] || set[0];
         if (spr) {
-          const scale = (e.r * 2.4) / spr.h;
+          const scale = (vr * 2.4) / spr.h;
           const sw = spr.w * scale, sh = spr.h * scale;
           const img = e.hitFlash > 0 ? spr.white : spr.img;
           ctx.save();
@@ -170,7 +172,7 @@
         }
       }
       if (!drew) {
-        pathShape(ctx, e.shape, e.x, e.y, e.r);
+        pathShape(ctx, e.shape, e.x, e.y, vr);
         ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color; ctx.fill();
         ctx.lineWidth = e.boss ? 3 : 1.5;
         ctx.strokeStyle = e.boss ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)'; ctx.stroke();
@@ -187,9 +189,9 @@
         ctx.beginPath(); ctx.arc(e.x, e.y - e.r - 4, 2, 0, Engine.TAU); ctx.fill();
       }
       if (e.boss) {
-        const w = e.r * 2.2, frac = Math.max(0, e.hp / e.maxHp);
-        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(e.x - w / 2, e.y - e.r - 16, w, 5);
-        ctx.fillStyle = '#ff5a6e'; ctx.fillRect(e.x - w / 2, e.y - e.r - 16, w * frac, 5);
+        const w = vr * 2.2, frac = Math.max(0, e.hp / e.maxHp);
+        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(e.x - w / 2, e.y - vr - 16, w, 5);
+        ctx.fillStyle = '#ff5a6e'; ctx.fillRect(e.x - w / 2, e.y - vr - 16, w * frac, 5);
       }
     }
   }
@@ -218,6 +220,36 @@
         ctx.beginPath(); ctx.arc(m.x, m.y, m.triggerR, 0, Engine.TAU); ctx.stroke();
       }
     }
+  }
+
+  // boss mortar telegraphs: crimson targeting reticle that fills as impact nears
+  function drawSlams(ctx, game) {
+    const list = game.slams;
+    if (!list || !list.length) return;
+    ctx.save();
+    for (let i = 0; i < list.length; i++) {
+      const s = list[i];
+      const prog = Math.min(1, s.t / s.delay);
+      // outer ring
+      ctx.strokeStyle = `rgba(255,59,94,${0.35 + 0.5 * prog})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Engine.TAU); ctx.stroke();
+      // collapsing aim ring + filling core
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.radius * (1 - prog * 0.85), 0, Engine.TAU); ctx.stroke();
+      ctx.fillStyle = `rgba(255,59,94,${0.10 + 0.22 * prog})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.radius * prog, 0, Engine.TAU); ctx.fill();
+      // rotating crosshair ticks
+      const a0 = prog * 3;
+      ctx.lineWidth = 2.5;
+      for (let k = 0; k < 4; k++) {
+        const a = a0 + k * Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(s.x + Math.cos(a) * (s.radius - 9), s.y + Math.sin(a) * (s.radius - 9));
+        ctx.lineTo(s.x + Math.cos(a) * (s.radius + 5), s.y + Math.sin(a) * (s.radius + 5));
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   function drawOrbiters(ctx, game) {
@@ -481,6 +513,7 @@
     drawCrystals(ctx, game);
     drawPickups(ctx, game);
     drawMines(ctx, game);
+    drawSlams(ctx, game);
     drawProjectiles(ctx, game);
     drawEnemyProjectiles(ctx, game);
     drawSentries(ctx, game);
