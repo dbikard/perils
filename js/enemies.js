@@ -4,19 +4,22 @@
   const E = global.Engine;
 
   const ENEMY_TYPES = {
-    swarmer:  { r: 10, hp: 12,  speed: 64,  damage: 7,  color: '#ff5a6e', shape: 'circle' },
-    sprinter: { r: 8,  hp: 9,   speed: 122, damage: 6,  color: '#ff8a5a', shape: 'tri' },
-    hulk:     { r: 18, hp: 78,  speed: 38,  damage: 16, color: '#c0466e', shape: 'square' },
-    spitter:  { r: 11, hp: 20,  speed: 50,  damage: 5,  color: '#ffb347', shape: 'diamond',
+    swarmer:  { r: 10, hp: 12,  speed: 64,  damage: 9,  xp: 1, color: '#ff5a6e', shape: 'circle' },
+    sprinter: { r: 8,  hp: 9,   speed: 122, damage: 8,  xp: 1, color: '#ff8a5a', shape: 'tri' },
+    hulk:     { r: 18, hp: 78,  speed: 38,  damage: 16, xp: 4, color: '#c0466e', shape: 'square' },
+    spitter:  { r: 11, hp: 20,  speed: 50,  damage: 5,  xp: 2, color: '#ffb347', shape: 'diamond',
                 ranged: true, fireRange: 340, fireCd: 2.4, projSpeed: 210, projDmg: 9 },
-    boss:     { r: 34, hp: 1200, speed: 44, damage: 24, color: '#ff3b5e', shape: 'square', boss: true }
+    boss:     { r: 34, hp: 700, speed: 44, damage: 24, xp: 30, color: '#ff3b5e', shape: 'square', boss: true }
   };
 
-  function spawnEnemy(game, typeId, x, y) {
+  function spawnEnemy(game, typeId, x, y, elite) {
     const def = ENEMY_TYPES[typeId];
     const e = game.enemies.spawn();
-    const hpScale = 1 + game.timeSec * 0.013;
-    const dmgScale = 1 + game.timeSec * 0.004;
+    // gentle linear HP growth, then a quadratic late-game wall (a maxed build
+    // should still feel hunted at minute 5 — threat must outpace power slightly)
+    const t = game.timeSec;
+    const hpScale = 1 + t * 0.007 + Math.max(0, t - 150) * Math.max(0, t - 150) * 0.0001;
+    const dmgScale = 1 + game.timeSec * 0.003;
     e.type = typeId; e.x = x; e.y = y; e.r = def.r;
     e.maxHp = def.hp * hpScale; e.hp = e.maxHp;
     e.speed = def.speed; e.damage = def.damage * dmgScale;
@@ -26,6 +29,14 @@
     e.fireTimer = def.fireCd ? def.fireCd * 0.5 : 0;
     e.projSpeed = def.projSpeed || 0; e.projDmg = (def.projDmg || 0) * dmgScale;
     e.boss = !!def.boss;
+    e.elite = false; e.xpValue = def.xp || 1;
+    if (elite) {
+      // elite: tanky, faster, juicy bounty — worth diving into the swarm for
+      e.elite = true; e.r = def.r * 1.3;
+      e.maxHp *= 4; e.hp = e.maxHp;
+      e.speed *= 1.15; e.damage *= 1.5;
+      e.xpValue = Math.max(6, e.xpValue * 5);
+    }
     return e;
   }
 
@@ -96,6 +107,12 @@
 
   function pickType(game) {
     const t = game.timeSec, r = game.rng();
+    if (t > 240) { // late mix punishes pure kiting: ranged + fast dominate
+      if (r < 0.15) return 'hulk';
+      if (r < 0.50) return 'spitter';
+      if (r < 0.80) return 'sprinter';
+      return 'swarmer';
+    }
     if (t > 180 && r < 0.12) return 'hulk';
     if (t > 90 && r < 0.30) return 'spitter';
     if (t > 30 && r < 0.42) return 'sprinter';
@@ -110,12 +127,12 @@
 
   function updateSpawning(game, dt) {
     const t = game.timeSec, escaping = game.phase === 'ESCAPE';
-    const MAX = 380;
+    const MAX = 300;
 
-    // boss waves every ~120s
+    // boss waves: every ~120s, tightening to 90s late
     game.bossTimer -= dt;
     if (game.bossTimer <= 0) {
-      game.bossTimer = 120;
+      game.bossTimer = t > 240 ? 90 : 120;
       if (game.enemies.count < MAX) {
         const pos = spawnRing(game);
         spawnEnemy(game, 'boss', pos.x, pos.y);
@@ -127,19 +144,39 @@
 
     game.spawnTimer -= dt;
     if (game.spawnTimer > 0) return;
-    let interval = Math.max(0.2, 1.1 - t * 0.011);
-    let batch = 1 + Math.floor(t / 30);
-    if (escaping) { interval *= 0.55; batch = Math.ceil(batch * 1.6); }
-    game.spawnTimer += interval;
+    // pressure/release: ramping spawn rate with a surge at the top of each
+    // minute and a lull at the end (breathe, collect XP) — flow theory.
+    // enemies/sec: shallow ramp through the midgame, sharp ramp after 3min
+    let rate = 0.85 + t * 0.009 + Math.max(0, t - 180) * 0.022; // 0.85 → ~2.5 @3min → ~6.2 @5min
+    const phase = t % 60;
+    if (phase >= 48) rate *= 0.35;           // lull
+    else if (t > 60 && phase < 8) rate *= 1.4; // surge
+    if (escaping) rate *= 2.5;               // the escape is the hardest moment by design
+    const batch = 1 + Math.floor(t / 75);
+    game.spawnTimer += batch / rate;
     if (game.enemies.count >= MAX) return;
 
     for (let b = 0; b < batch && game.enemies.count < MAX; b++) {
+      // late game, some hostiles crawl out of the vents anywhere on the ship —
+      // open space stops being guaranteed-safe, so pure kiting isn't enough
+      const vent = (t > 150 || escaping) && game.rng.chance(escaping ? 0.55 : 0.35);
+      const pos = vent
+        ? game.map.randomFloorRingWorld(game.rng, game.player.x, game.player.y, 280, 1e9)
+        : spawnRing(game);
+      const elite = t > 90 && game.rng.chance(0.04);
+      spawnEnemy(game, pickType(game), pos.x, pos.y, elite);
+    }
+  }
+
+  // immediate wave around the player (escape kickoff etc.)
+  function burst(game, n) {
+    for (let b = 0; b < n && game.enemies.count < 300; b++) {
       const pos = spawnRing(game);
       spawnEnemy(game, pickType(game), pos.x, pos.y);
     }
   }
 
   global.ENEMY_TYPES = ENEMY_TYPES;
-  global.Enemies = { ENEMY_TYPES, spawnEnemy, updateMovement, updateEnemyProjectiles, updateSpawning };
+  global.Enemies = { ENEMY_TYPES, spawnEnemy, updateMovement, updateEnemyProjectiles, updateSpawning, burst };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.Enemies;
 })(typeof window !== 'undefined' ? window : globalThis);
