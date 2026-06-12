@@ -208,6 +208,15 @@ function makeBots(seed) {
         const st = this.st, p = game.player;
         const threat = threatVector(game, 230);
 
+        // dodge boss mortar telegraphs about to detonate
+        for (const s of (game.slams || [])) {
+          const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
+          if (d < s.radius + 24 && s.delay - s.t < 0.8) {
+            const l = d || 1;
+            threat.x += dx / l * 2.2; threat.y += dy / l * 2.2;
+          }
+        }
+
         // --- abilities ---
         if (p.blink.cd <= 0 && (threat.nearest < 26 || threat.count >= 10)) tap('blink');
         if (p.special && p.special.cd <= 0 && countWithin(game, 200) >= 5) tap('special');
