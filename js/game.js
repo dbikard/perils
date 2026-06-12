@@ -107,7 +107,7 @@
       id: 2, name: 'HELIOS STATION', next: null, warpTime: 300,
       map: { cols: 86, rows: 62, rooms: 18, roomMin: 5, roomMax: 13 },
       theme: { floor: '#140f1f', edge: 'rgba(196,142,255,0.55)', grid: 'rgba(196,142,255,0.06)' },
-      caches: 4, vents: 12, wraiths: true, rateMult: 1.1, hpMult: 1.5,
+      caches: 4, vents: 12, wraiths: true, rateMult: 1.1, hpMult: 3.0,
       survivors: [{ name: 'CHIEF VANCE' }, { name: 'SPC. OKAFOR' }],
       exitLabel: 'SHUTTLE',
       warpText: 'SHUTTLE PREFLIGHT COMPLETE — REACH THE DOCK',
