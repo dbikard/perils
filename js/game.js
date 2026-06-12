@@ -2,6 +2,7 @@
 (function (global) {
   'use strict';
   const E = global.Engine;
+  const hasDOM = typeof document !== 'undefined';
 
   const game = {
     phase: 'MENU',          // MENU | PLAYING | GAME_OVER (ESCAPE/VICTORY in Phase 2)
@@ -42,17 +43,27 @@
     if (global.Particles) global.Particles.burst(game, e.x, e.y, e.color || '#ff5a6e', e.boss ? 26 : 6, e.boss ? 230 : 150);
     if (global.SFX) global.SFX.kill();
     if (e.boss) E.shake(11);
-    // drop an XP crystal
-    const c = game.crystals.spawn();
-    c.x = e.x; c.y = e.y; c.r = 5; c.value = 1;
-    // occasionally drop a healing pack — bosses always, others rarely
-    if (e.boss || game.rng() < 0.025) {
+    // drop an XP crystal worth the enemy's bounty (big foes = big payouts).
+    // Past a soft cap, fold the value into an existing crystal instead of spawning more.
+    const value = e.xpValue || 1;
+    if (game.crystals.count >= 350) {
+      const list = game.crystals.active;
+      const c = list[Math.floor(game.rng() * list.length)];
+      c.value += value; c.r = crystalRadius(c.value);
+    } else {
+      const c = game.crystals.spawn();
+      c.x = e.x; c.y = e.y; c.value = value; c.r = crystalRadius(value);
+    }
+    // occasionally drop a healing pack — bosses/elites always, others rarely
+    if (e.boss || e.elite || game.rng() < 0.025) {
       const hp = game.pickups.spawn();
       hp.x = e.x; hp.y = e.y; hp.r = 9; hp.kind = 'heal';
       hp.heal = e.boss ? 45 : 25; hp.life = 18;
     }
     game.enemies.release(e);
   };
+
+  function crystalRadius(value) { return Math.min(11, 4 + Math.sqrt(value) * 1.4); }
 
   game.effects = [];
   game.addEffect = function (e) { game.effects.push(e); };
@@ -69,10 +80,13 @@
     if (amount >= 2) E.shake(4);                  // discrete hits (bolts/spikes), not melee tick
   };
 
-  const WARP_TIME = 300; // seconds of siege before the warp drive is ready (tunable)
+  const WARP_TIME = 300;     // seconds of siege before the warp drive is ready (tunable)
+  const EXIT_HOLD_TIME = 6;  // seconds the airlock pad must be held while it cycles
 
-  function startGame() {
-    E.seed(Math.floor(Math.random() * 1e9));
+  function startGame(opts) {
+    const seed = (opts && typeof opts.seed === 'number') ? opts.seed : Math.floor(Math.random() * 1e9);
+    E.seed(seed);
+    game.seed = seed;
     game.rng = E.rng;
 
     game.map = global.MapGen.generate({ rng: game.rng });
@@ -93,14 +107,15 @@
     global.Weapons.acquire(game, 'pulse'); // starting weapon
 
     game.timeSec = 0; game.spawnTimer = 0.5; game.ffTimer = 0; game.kills = 0;
-    game.warp = 0; game.bossTimer = 120; game.enemySlow = 0; game.banner = null;
+    game.warp = 0; game.bossTimer = 150; game.enemySlow = 0; game.banner = null;
+    game.exitHold = 0;
     game.effects = [];
     game.particles = [];
     if (global.SFX) { global.SFX.init(); global.SFX.resume(); }
     game.upgradeLevels = {};
     game.pendingLevels = 0;
     game._choices = null;
-    global.UI.layoutButtons(game);
+    if (global.UI) global.UI.layoutButtons(game);
     E.paused = false;
     game.phase = 'PLAYING';
 
@@ -110,22 +125,27 @@
 
     E.camera.x = p.x; E.camera.y = p.y;
 
-    document.getElementById('menu').classList.add('hidden');
-    document.getElementById('hud').classList.remove('hidden');
-
-    if (!E.running) E.start(update, render);
+    if (hasDOM) {
+      document.getElementById('menu').classList.add('hidden');
+      document.getElementById('hud').classList.remove('hidden');
+      if (!E.running) E.start(update, render);
+    }
   }
 
   function gameOver() {
     game.phase = 'GAME_OVER';
     if (global.SFX) global.SFX.over();
     E.stop();
+    if (!hasDOM) return;
+    const rec = global.Meta ? global.Meta.record(game, false) : null;
     const menu = document.getElementById('menu');
     document.getElementById('hud').classList.add('hidden');
-    menu.querySelector('h1').textContent = 'SHIP LOST';
+    menu.querySelector('h1').textContent = (rec && rec.newBestTime) ? 'NEW RECORD' : 'SHIP LOST';
     menu.querySelector('.tagline').textContent =
-      `You survived ${formatTime(game.timeSec)} and downed ${game.kills} hostiles.`;
+      `You survived ${formatTime(game.timeSec)} and downed ${game.kills} hostiles.`
+      + ((rec && rec.newBestTime) ? ' Personal best!' : '');
     document.getElementById('start-btn').textContent = 'RELAUNCH';
+    if (global.Meta) global.Meta.renderMenuStats();
     menu.classList.remove('hidden');
   }
 
@@ -133,12 +153,15 @@
     game.phase = 'VICTORY';
     if (global.SFX) global.SFX.victory();
     E.stop();
+    if (!hasDOM) return;
+    const rec = global.Meta ? global.Meta.record(game, true) : null;
     const menu = document.getElementById('menu');
     document.getElementById('hud').classList.add('hidden');
-    menu.querySelector('h1').textContent = 'ESCAPED';
+    menu.querySelector('h1').textContent = (rec && rec.firstEscape) ? 'FIRST ESCAPE' : 'ESCAPED';
     menu.querySelector('.tagline').textContent =
       `You fled the wreck in ${formatTime(game.timeSec)} — ${game.kills} hostiles down. The Vessel is behind you.`;
     document.getElementById('start-btn').textContent = 'RUN AGAIN';
+    if (global.Meta) global.Meta.renderMenuStats();
     menu.classList.remove('hidden');
   }
 
@@ -156,7 +179,11 @@
     // warp drive charges during the siege; when full, the run flips to the escape
     if (game.phase === 'PLAYING') {
       game.warp += dt / WARP_TIME;
-      if (game.warp >= 1) { game.warp = 1; game.phase = 'ESCAPE'; game.announce('WARP DRIVE ONLINE — REACH THE AIRLOCK', 3.5); }
+      if (game.warp >= 1) {
+        game.warp = 1; game.phase = 'ESCAPE';
+        game.announce('WARP DRIVE ONLINE — REACH THE AIRLOCK', 3.5);
+        global.Enemies.burst(game, 14); // the ship knows you're leaving
+      }
     }
     if (game.enemySlow > 0) game.enemySlow -= dt;
     if (game.banner && game.banner.life > 0) game.banner.life -= dt;
@@ -175,7 +202,7 @@
     for (let i = 0; i < elist.length; i++) game.enemyHash.insert(elist[i]);
 
     // ability buttons layout (keeps tap regions current after resize)
-    global.UI.layoutButtons(game);
+    if (global.UI) global.UI.layoutButtons(game);
 
     // player movement (per-axis wall collision)
     if (p.hitFlash > 0) p.hitFlash -= dt;
@@ -207,10 +234,20 @@
     global.Enemies.updateEnemyProjectiles(game, dt);
     global.Enemies.updateSpawning(game, dt);
 
-    // escape: reaching the airlock wins the run
+    // escape: hold the airlock pad while it cycles — the final stand
     if (game.phase === 'ESCAPE') {
-      const ex = map.exit, rr = p.r + 30;
-      if ((p.x - ex.x) * (p.x - ex.x) + (p.y - ex.y) * (p.y - ex.y) < rr * rr) { victory(); return; }
+      const ex = map.exit, rr = p.r + 34;
+      const onPad = (p.x - ex.x) * (p.x - ex.x) + (p.y - ex.y) * (p.y - ex.y) < rr * rr;
+      if (onPad) {
+        if (game.exitHold === 0) {
+          game.announce('AIRLOCK CYCLING — HOLD POSITION', 2.5);
+          global.Enemies.burst(game, 8); // everything converges on the breach
+        }
+        game.exitHold += dt;
+        if (game.exitHold >= EXIT_HOLD_TIME) { victory(); return; }
+      } else if (game.exitHold > 0) {
+        game.exitHold = Math.max(0, game.exitHold - dt * 0.5);
+      }
     }
 
     // crystal magnet/pickup → leveling
@@ -230,10 +267,12 @@
     E.camera.y = map.worldH > E.height ? E.clamp(p.y, halfH, map.worldH - halfH) : map.worldH / 2;
 
     // HUD
-    document.getElementById('hud-timer').textContent = formatTime(game.timeSec);
-    game._fps += ((1 / Math.max(dt, 1e-4)) - game._fps) * 0.1;
-    document.getElementById('hud-debug').textContent =
-      `LV ${p.level}  ·  ${game.enemies.count} hostiles  ·  ${game.kills} kills  ·  ${Math.round(game._fps)} fps`;
+    if (hasDOM) {
+      document.getElementById('hud-timer').textContent = formatTime(game.timeSec);
+      game._fps += ((1 / Math.max(dt, 1e-4)) - game._fps) * 0.1;
+      document.getElementById('hud-debug').textContent =
+        `LV ${p.level}  ·  ${game.enemies.count} hostiles  ·  ${game.kills} kills  ·  ${Math.round(game._fps)} fps`;
+    }
 
     if (p.hp <= 0) { p.hp = 0; gameOver(); }
   }
@@ -255,7 +294,7 @@
         if (global.Particles) global.Particles.sparkle(game, c.x, c.y, '#54ff9f');
         while (p.xp >= p.xpNext) {
           p.xp -= p.xpNext; p.level++;
-          p.xpNext = Math.floor(p.xpNext * 1.35 + 2);
+          p.xpNext = Math.floor(p.xpNext * 1.27 + 2);
           game.pendingLevels++;
         }
         game.crystals.release(c);
@@ -305,8 +344,12 @@
     global.addEventListener('keydown', (e) => { if (e.key && e.key.toLowerCase() === 'm' && global.SFX) sync(global.SFX.toggle()); });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  if (hasDOM) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+  }
 
   global.startGame = startGame;
+  // headless access for sim.js: start a run and step the real update loop directly
+  global.GameRun = { game, startGame, update, WARP_TIME, EXIT_HOLD_TIME };
 })(typeof window !== 'undefined' ? window : globalThis);

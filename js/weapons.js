@@ -69,7 +69,7 @@
     pulse: {
       id: 'pulse', name: 'Pulse Blaster', icon: '◦', color: '#38e8ff', maxLevel: 8,
       blurb: 'Bolts at the nearest hostile',
-      stats: (l) => ({ cooldown: Math.max(0.28, 0.6 - 0.035 * (l - 1)), damage: 14 + 4 * (l - 1),
+      stats: (l) => ({ cooldown: Math.max(0.28, 0.6 - 0.035 * (l - 1)), damage: 14 + 6 * (l - 1),
         count: 1 + Math.floor((l - 1) / 3), pierce: Math.floor((l - 1) / 4), speed: 470, projR: 5, life: 1.3, range: 520 }),
       update(game, w, dt) {
         const p = game.player, e = eff(game), s = this.stats(w.level);
@@ -93,7 +93,7 @@
     scatter: {
       id: 'scatter', name: 'Scatter Gun', icon: '≪', color: '#ffd166', maxLevel: 8,
       blurb: 'Cone of pellets in your heading',
-      stats: (l) => ({ cooldown: Math.max(0.5, 0.95 - 0.04 * (l - 1)), damage: 8 + 2 * (l - 1),
+      stats: (l) => ({ cooldown: Math.max(0.5, 0.95 - 0.04 * (l - 1)), damage: 8 + 3 * (l - 1),
         pellets: 4 + Math.floor((l - 1) / 2), spread: 0.75, speed: 430, projR: 4, life: 0.42 }),
       update(game, w, dt) {
         const p = game.player, e = eff(game), s = this.stats(w.level);
@@ -113,7 +113,7 @@
     arc: {
       id: 'arc', name: 'Arc Coil', icon: '⌁', color: '#a9b8ff', maxLevel: 8,
       blurb: 'Lightning that chains between foes',
-      stats: (l) => ({ cooldown: Math.max(0.6, 1.2 - 0.06 * (l - 1)), damage: 12 + 3 * (l - 1),
+      stats: (l) => ({ cooldown: Math.max(0.6, 1.2 - 0.06 * (l - 1)), damage: 12 + 5 * (l - 1),
         chains: 2 + Math.floor((l - 1) / 2), jump: 160, range: 360 }),
       update(game, w, dt) {
         const p = game.player, e = eff(game), s = this.stats(w.level);
@@ -137,7 +137,7 @@
     beam: {
       id: 'beam', name: 'Rail Beam', icon: '═', color: '#54ff9f', maxLevel: 8,
       blurb: 'Piercing beam at the nearest hostile',
-      stats: (l) => ({ cooldown: Math.max(0.7, 1.4 - 0.07 * (l - 1)), damage: 20 + 6 * (l - 1),
+      stats: (l) => ({ cooldown: Math.max(0.7, 1.4 - 0.07 * (l - 1)), damage: 20 + 9 * (l - 1),
         width: 10 + 2 * (l - 1), range: 540 }),
       update(game, w, dt) {
         const p = game.player, e = eff(game), s = this.stats(w.level);
@@ -163,7 +163,7 @@
     orbiter: {
       id: 'orbiter', name: 'Orbiters', icon: '◍', color: '#7fd8ff', maxLevel: 8,
       blurb: 'Drones that circle and shred contact',
-      stats: (l) => ({ bodies: 2 + Math.floor((l - 1) / 2), dps: 26 + 6 * (l - 1),
+      stats: (l) => ({ bodies: 2 + Math.floor((l - 1) / 2), dps: 26 + 9 * (l - 1),
         radius: 72 + 4 * (l - 1), bodyR: 12, spin: 2.2 }),
       update(game, w, dt) {
         const p = game.player, e = eff(game), s = this.stats(w.level);
@@ -190,7 +190,7 @@
     mine: {
       id: 'mine', name: 'Mine Layer', icon: '◆', color: '#ff5a6e', maxLevel: 8,
       blurb: 'Drops proximity mines that blast an area',
-      stats: (l) => ({ cooldown: Math.max(0.8, 1.8 - 0.08 * (l - 1)), damage: 36 + 8 * (l - 1),
+      stats: (l) => ({ cooldown: Math.max(0.8, 1.8 - 0.08 * (l - 1)), damage: 36 + 12 * (l - 1),
         radius: 55 + 4 * (l - 1), triggerR: 24, life: 16 }),
       update(game, w, dt) {
         const p = game.player, s = this.stats(w.level), e = eff(game);

@@ -63,6 +63,15 @@
       ctx.fillStyle = `rgba(84,255,159,${0.5 + 0.4 * pulse})`;
       ctx.font = '12px system-ui'; ctx.textAlign = 'center';
       ctx.fillText('AIRLOCK', ex.x, ex.y - 36);
+      // cycling progress while the pad is held
+      if (game.exitHold > 0) {
+        const frac = Math.min(1, game.exitHold / 6);
+        ctx.strokeStyle = '#54ff9f'; ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(ex.x, ex.y, 34, -Math.PI / 2, -Math.PI / 2 + Engine.TAU * frac);
+        ctx.stroke();
+        ctx.fillText(`CYCLING ${Math.floor(frac * 100)}%`, ex.x, ex.y + 50);
+      }
       ctx.textAlign = 'start';
     }
     ctx.restore();
@@ -165,6 +174,13 @@
         ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color; ctx.fill();
         ctx.lineWidth = e.boss ? 3 : 1.5;
         ctx.strokeStyle = e.boss ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)'; ctx.stroke();
+      }
+      if (e.elite) { // gold pulse ring: juicy bounty, worth the risk
+        const pulse = 0.55 + 0.35 * Math.sin(t * 6 + e.x * 0.03);
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(255,209,102,${pulse})`; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 4, 0, Engine.TAU); ctx.stroke();
+        ctx.restore();
       }
       if (e.stun > 0) {
         ctx.fillStyle = '#bff7ff';

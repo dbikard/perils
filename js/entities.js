@@ -33,8 +33,8 @@
       faceLeft: false,      // sprite horizontal flip (billboard)
       moving: false, animTime: 0, // walk-cycle animation state
       weapons: [],          // [{ def, timer }]
-      level: 1, xp: 0, xpNext: 5,
-      magnet: 95,           // crystal pickup radius (px)
+      level: 1, xp: 0, xpNext: 4,
+      magnet: 80,           // crystal pickup radius (px)
       regen: 0,             // hp per second
       armor: 0,             // armour tier — reduces damage taken + adds visible plating
       overload: 0,          // seconds of Overload weapon surge remaining
