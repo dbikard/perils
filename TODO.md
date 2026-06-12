@@ -40,18 +40,32 @@
 - [ ] Special-acquire choices (5 of them) can crowd the early level-up pool — consider weighting.
 - [ ] Boss HP scaling vs. late-game DPS — confirm bosses are threats, not speed bumps.
 
-## Phase 3 — World structure + meta
-- [ ] Banked salvage + permanent upgrades (localStorage)
+## Phase 3 — World structure + meta  ✅ MOSTLY DONE (v0.6.0)
+- [x] `sim.js` headless balance bot (random/greedy/skilled, --stage, --ablate, --determinism, --trace)
+- [x] Difficulty tuned vs DESIGN_PRINCIPLES bot targets; escape = hold-the-airlock gauntlet
+- [x] Records + stage unlocks (localStorage, `meta.js`)
+- [x] World/stage 2: HELIOS STATION (bigger map, purple theme, vents, wraiths)
+- [x] Weapon caches on the map own weapon acquisition (exploration incentive)
+- [x] Survivors: rescue/protect named crew; fire support; story comms per stage
+- [ ] Banked salvage + permanent upgrades
 - [ ] Weapon evolutions (max weapon + paired passive)
 - [ ] 2nd character
-- [ ] World completion → unlock World 2
+
+## Phase 5 — LAN co-op (beta, v0.6.0)
+- [x] `net.js`: serverless WebRTC handshake (copy-paste compressed link codes) + STUN
+- [x] Deterministic lockstep input-sync (fixed timestep + seeded RNG; quantized inputs)
+- [x] 2-player runs: shared XP, per-player builds, partner revive, non-blocking pick sheets
+- [x] Desync detector (periodic state-hash exchange) + `node sim.js --determinism`
+- [ ] Real two-device playtest (handshake UX, input delay feel)
+- [ ] Cross-browser determinism audit (Math.sin/cos differ across engines → desync warning shows)
+- [ ] Optional: room-code signaling via a free broker to replace copy-paste
 
 ## Phase 4 — Polish + infra
-- [ ] Art/SFX pass
+- [ ] Art/SFX pass (wraith + boss sprites, vent/cache art)
 - [ ] Version-bump pre-commit git hook
-- [ ] PWA manifest + icons
-- [ ] `sim.js` headless balance bot + ablation tests
 
 ## Known issues / decisions
 - Renderer kept isolated in `render.js` so PixiJS can swap in if Canvas 2D hits a wall.
-- Deploy target: GitHub Pages (static; `git push`).
+- Deploy target: GitHub Pages (static; `git push`) — co-op stays serverless for this reason.
+- Difficulty knob lesson: spawn-rate increases FEED the player XP (snowball); use enemy HP/damage
+  and composition for threat, XP/weapon scaling for power.

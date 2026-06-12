@@ -8,31 +8,31 @@
   // passive + ability upgrades (stack-limited, tracked in game.upgradeLevels)
   const PASSIVES = [
     { id: 'amplifier', name: 'Damage Amplifier', icon: '✦', color: '#38e8ff', max: 6, tag: 'PASSIVE',
-      desc: 'Weapon damage +16%', apply: (g) => { g.player.stats.damageMult *= 1.16; } },
+      desc: 'Weapon damage +16%', apply: (g, p) => { p.stats.damageMult *= 1.16; } },
     { id: 'coolant', name: 'Coolant System', icon: '❄', color: '#7fd8ff', max: 6, tag: 'PASSIVE',
-      desc: 'Weapon cooldown −9%', apply: (g) => { g.player.stats.cooldownMult *= 0.91; } },
+      desc: 'Weapon cooldown −9%', apply: (g, p) => { p.stats.cooldownMult *= 0.91; } },
     { id: 'multiplier', name: 'Munitions Splitter', icon: '⁂', color: '#a9b8ff', max: 4, tag: 'PASSIVE',
-      desc: '+1 projectile on volley weapons', apply: (g) => { g.player.stats.count += 1; } },
+      desc: '+1 projectile on volley weapons', apply: (g, p) => { p.stats.count += 1; } },
     { id: 'engine', name: 'Ion Engine', icon: '»', color: '#54ff9f', max: 6, tag: 'PASSIVE',
-      desc: 'Move speed +12%', apply: (g) => { g.player.stats.speedMult *= 1.12; } },
+      desc: 'Move speed +12%', apply: (g, p) => { p.stats.speedMult *= 1.12; } },
     { id: 'armor', name: 'Armor Plating', icon: '▰', color: '#7fd8ff', max: 8, tag: 'ARMOR',
-      desc: '+1 armor (−7% damage, +20 HP)', apply: (g) => { g.player.armor += 1; g.player.maxHp += 20; g.player.hp = Math.min(g.player.maxHp, g.player.hp + 20); } },
+      desc: '+1 armor (−7% damage, +20 HP)', apply: (g, p) => { p.armor += 1; p.maxHp += 20; p.hp = Math.min(p.maxHp, p.hp + 20); } },
     { id: 'magnet', name: 'Salvage Magnet', icon: '◎', color: '#54ff9f', max: 5, tag: 'PASSIVE',
-      desc: 'Pickup radius +35%', apply: (g) => { g.player.magnet *= 1.35; } },
+      desc: 'Pickup radius +35%', apply: (g, p) => { p.magnet *= 1.35; } },
     { id: 'regen', name: 'Repair Drone', icon: '✚', color: '#54ff9f', max: 4, tag: 'PASSIVE',
-      desc: 'Regenerate +0.8 HP/s', apply: (g) => { g.player.regen += 0.8; } },
+      desc: 'Regenerate +0.8 HP/s', apply: (g, p) => { p.regen += 0.8; } },
     { id: 'blink_cd', name: 'Blink Capacitor', icon: '⟶', color: '#9af0ff', max: 4, tag: 'ABILITY',
-      desc: 'Blink cooldown −18%', apply: (g) => { g.player.blink.cdMult *= 0.82; } },
+      desc: 'Blink cooldown −18%', apply: (g, p) => { p.blink.cdMult *= 0.82; } },
     { id: 'blink_dist', name: 'Phase Coils', icon: '⟶', color: '#9af0ff', max: 3, tag: 'ABILITY',
-      desc: 'Blink distance +25%', apply: (g) => { g.player.blink.dist *= 1.25; } },
+      desc: 'Blink distance +25%', apply: (g, p) => { p.blink.dist *= 1.25; } },
     { id: 'ult_charge', name: 'Reactor Tap', icon: '⚡', color: '#ffd166', max: 4, tag: 'ABILITY',
-      desc: 'Ultimate charges +25% faster', apply: (g) => { g.player.ult.mult *= 1.25; } }
+      desc: 'Ultimate charges +25% faster', apply: (g, p) => { p.ult.mult *= 1.25; } }
   ];
 
   const REPAIR = { id: 'repair', name: 'Emergency Repair', icon: '✚', color: '#ff9fae', max: Infinity, tag: 'SALVAGE',
-    desc: 'Repair 30% of max HP', level: 0, apply: (g) => { g.player.hp = Math.min(g.player.maxHp, g.player.hp + g.player.maxHp * 0.3); } };
+    desc: 'Repair 30% of max HP', level: 0, apply: (g, p) => { p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.3); } };
 
-  function levelOf(game, id) { return (game.upgradeLevels && game.upgradeLevels[id]) || 0; }
+  function levelOf(pl, id) { return (pl.upgradeLevels && pl.upgradeLevels[id]) || 0; }
 
   function weaponUpgradeChoice(w) {
     return { kind: 'weapon', id: 'w_' + w.id, name: w.def.name, icon: w.def.icon, color: w.def.color,
@@ -43,35 +43,48 @@
     const def = global.WEAPONS[id];
     return { kind: 'weapon', id: 'w_' + id, name: def.name, icon: def.icon, color: def.color,
       desc: def.blurb, tag: 'NEW WEAPON', level: 0, max: def.maxLevel,
-      apply: (g) => { global.Weapons.acquire(g, id); } };
+      apply: (g, p) => { global.Weapons.acquire(g, id, p); } };
   }
   function specialAcquireChoice(id) {
     const def = global.SPECIALS[id];
     return { kind: 'special', id: 's_' + id, name: def.name, icon: def.icon, color: def.color,
       desc: def.blurb, tag: 'SPECIAL · NEW', level: 0, max: def.maxLevel,
-      apply: (g) => { global.Abilities.setSpecial(g, id); } };
+      apply: (g, p) => { global.Abilities.setSpecial(g, id, p); } };
   }
   function specialUpgradeChoice(sp) {
     return { kind: 'special', id: 's_' + sp.id, name: sp.def.name, icon: sp.def.icon, color: sp.def.color,
       desc: sp.def.blurb, tag: `SPECIAL · Lv ${sp.level}→${sp.level + 1}`, level: sp.level, max: sp.def.maxLevel,
       apply: () => { sp.level++; } };
   }
-  function passiveChoice(game, u) {
+  function passiveChoice(pl, u) {
     return { kind: 'passive', pid: u.id, id: u.id, name: u.name, icon: u.icon, color: u.color,
-      desc: u.desc, tag: u.tag, level: levelOf(game, u.id), max: u.max, apply: u.apply };
+      desc: u.desc, tag: u.tag, level: levelOf(pl, u.id), max: u.max, apply: u.apply };
   }
 
-  function generateChoices(game, n) {
-    const p = game.player, pool = [];
+  // new weapons are FOUND in caches on the map (exploration incentive) —
+  // the level-up pool only deepens what you already carry
+  function generateWeaponChoices(game, n, pl) {
+    const p = pl || game.player;
+    if (p.weapons.length >= WEAPON_CAP) return [];
     const owned = new Set(p.weapons.map(w => w.id));
+    const pool = [];
+    for (const id in global.WEAPONS) if (!owned.has(id)) pool.push(weaponAcquireChoice(id));
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(game.rng() * (i + 1));
+      const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    return pool.slice(0, n);
+  }
+
+  function generateChoices(game, n, pl) {
+    const p = pl || game.player, pool = [];
 
     for (const w of p.weapons) if (w.level < w.def.maxLevel) pool.push(weaponUpgradeChoice(w));
-    if (p.weapons.length < WEAPON_CAP) for (const id in global.WEAPONS) if (!owned.has(id)) pool.push(weaponAcquireChoice(id));
 
     if (!p.special) { for (const id in global.SPECIALS) pool.push(specialAcquireChoice(id)); }
     else if (p.special.level < p.special.def.maxLevel) pool.push(specialUpgradeChoice(p.special));
 
-    for (const u of PASSIVES) if (levelOf(game, u.id) < u.max) pool.push(passiveChoice(game, u));
+    for (const u of PASSIVES) if (levelOf(p, u.id) < u.max) pool.push(passiveChoice(p, u));
 
     // Fisher–Yates with the run RNG
     for (let i = pool.length - 1; i > 0; i--) {
@@ -83,14 +96,15 @@
     return out;
   }
 
-  function applyChoice(game, choice) {
-    choice.apply(game);
+  function applyChoice(game, choice, pl) {
+    const p = pl || game.player;
+    choice.apply(game, p);
     if (choice.kind === 'passive') {
-      if (!game.upgradeLevels) game.upgradeLevels = {};
-      game.upgradeLevels[choice.pid] = (game.upgradeLevels[choice.pid] || 0) + 1;
+      if (!p.upgradeLevels) p.upgradeLevels = {};
+      p.upgradeLevels[choice.pid] = (p.upgradeLevels[choice.pid] || 0) + 1;
     }
   }
 
-  global.Upgrades = { PASSIVES, generateChoices, applyChoice, levelOf };
+  global.Upgrades = { PASSIVES, generateChoices, generateWeaponChoices, applyChoice, levelOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.Upgrades;
 })(typeof window !== 'undefined' ? window : globalThis);

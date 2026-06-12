@@ -13,8 +13,9 @@
     const minTy = Math.max(0, Math.floor(top / t) - 1);
     const maxTy = Math.min(map.rows - 1, Math.floor((top + H) / t) + 1);
 
+    const theme = map.theme || {};
     // floor panels
-    ctx.fillStyle = '#0b1422';
+    ctx.fillStyle = theme.floor || '#0b1422';
     for (let ty = minTy; ty <= maxTy; ty++) {
       for (let tx = minTx; tx <= maxTx; tx++) {
         if (map.isWallTile(tx, ty)) continue;
@@ -22,7 +23,7 @@
       }
     }
     // faint inner grid
-    ctx.strokeStyle = 'rgba(56,232,255,0.06)';
+    ctx.strokeStyle = theme.grid || 'rgba(56,232,255,0.06)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let ty = minTy; ty <= maxTy; ty++) {
@@ -33,7 +34,7 @@
     }
     ctx.stroke();
     // neon wall edges (floor tile sides that border a wall)
-    ctx.strokeStyle = 'rgba(56,232,255,0.55)';
+    ctx.strokeStyle = theme.edge || 'rgba(56,232,255,0.55)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (let ty = minTy; ty <= maxTy; ty++) {
@@ -62,7 +63,7 @@
     if (escaping) {
       ctx.fillStyle = `rgba(84,255,159,${0.5 + 0.4 * pulse})`;
       ctx.font = '12px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText('AIRLOCK', ex.x, ex.y - 36);
+      ctx.fillText((game.stageDef && game.stageDef.exitLabel) || 'AIRLOCK', ex.x, ex.y - 36);
       // cycling progress while the pad is held
       if (game.exitHold > 0) {
         const frac = Math.min(1, game.exitHold / 6);
@@ -172,10 +173,12 @@
         }
       }
       if (!drew) {
+        if (e.ghost) ctx.globalAlpha = 0.55 + 0.2 * Math.sin(t * 5 + e.x * 0.04); // spectral shimmer
         pathShape(ctx, e.shape, e.x, e.y, vr);
         ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color; ctx.fill();
         ctx.lineWidth = e.boss ? 3 : 1.5;
         ctx.strokeStyle = e.boss ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)'; ctx.stroke();
+        ctx.globalAlpha = 1;
       }
       if (e.elite) { // gold pulse ring: juicy bounty, worth the risk
         const pulse = 0.55 + 0.35 * Math.sin(t * 6 + e.x * 0.03);
@@ -222,6 +225,94 @@
     }
   }
 
+  // weapon caches: gold supply crates beckoning from the far rooms
+  function drawCaches(ctx, game) {
+    const list = game.caches;
+    if (!list || !list.length) return;
+    const t = game.timeSec;
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      if (c.taken) continue;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 3 + i * 2);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,209,102,${0.10 + 0.12 * pulse})`;
+      ctx.beginPath(); ctx.arc(c.x, c.y, 22 + 6 * pulse, 0, Engine.TAU); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#2a2316';
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+      ctx.fillRect(c.x - 11, c.y - 9, 22, 18);
+      ctx.strokeRect(c.x - 11, c.y - 9, 22, 18);
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✦', c.x, c.y + 1);
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    }
+  }
+
+  // survivors: waiting ones ping for help; followers trail you with a health pip
+  function drawSurvivors(ctx, game) {
+    const list = game.survivors;
+    if (!list || !list.length) return;
+    const t = game.timeSec;
+    for (const s of list) {
+      if (s.state === 'dead') continue;
+      if (s.state === 'waiting') {
+        const ping = (t % 1.4) / 1.4;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(127,216,255,${0.7 * (1 - ping)})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 14 + ping * 30, 0, Engine.TAU); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.fillStyle = '#10324a';
+      ctx.strokeStyle = '#7fd8ff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Engine.TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#7fd8ff';
+      ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(s.state === 'waiting' ? 'SOS' : s.name.split(' ').pop(), s.x, s.y - s.r - 6);
+      ctx.textAlign = 'start';
+      if (s.state === 'following' && s.hp < s.maxHp) {
+        const w = s.r * 2, frac = Math.max(0, s.hp / s.maxHp);
+        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(s.x - w / 2, s.y + s.r + 4, w, 3);
+        ctx.fillStyle = '#7fd8ff'; ctx.fillRect(s.x - w / 2, s.y + s.r + 4, w * frac, 3);
+      }
+    }
+  }
+
+  // hull-breach vents: subtle grate when idle, amber warning, violent suction
+  function drawVents(ctx, game) {
+    const list = game.vents;
+    if (!list || !list.length) return;
+    const t = game.timeSec;
+    for (const v of list) {
+      ctx.save();
+      if (v.phase === 'idle') {
+        ctx.strokeStyle = 'rgba(150,170,200,0.30)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(v.x, v.y, 12, 0, Engine.TAU); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(v.x - 7, v.y); ctx.lineTo(v.x + 7, v.y);
+        ctx.moveTo(v.x, v.y - 7); ctx.lineTo(v.x, v.y + 7);
+        ctx.stroke();
+      } else if (v.phase === 'warn') {
+        const flash = Math.sin(t * 14) > 0;
+        ctx.strokeStyle = flash ? '#ffb347' : 'rgba(255,179,71,0.35)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(v.x, v.y, 16, 0, Engine.TAU); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,179,71,0.25)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(v.x, v.y, 130, 0, Engine.TAU); ctx.stroke();
+      } else { // venting: collapsing suction rings + streaks
+        ctx.globalCompositeOperation = 'lighter';
+        for (let k = 0; k < 3; k++) {
+          const ring = 1 - ((t * 1.4 + k / 3) % 1);
+          ctx.strokeStyle = `rgba(160,200,255,${0.45 * (1 - ring)})`; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(v.x, v.y, 12 + ring * 118, 0, Engine.TAU); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(220,240,255,0.8)'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(v.x, v.y, 12, 0, Engine.TAU); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   // boss mortar telegraphs: crimson targeting reticle that fills as impact nears
   function drawSlams(ctx, game) {
     const list = game.slams;
@@ -253,7 +344,9 @@
   }
 
   function drawOrbiters(ctx, game) {
-    const ws = game.player.weapons;
+    const players = game.players || [game.player];
+    const ws = [];
+    for (const pl of players) ws.push(...pl.weapons);
     for (let i = 0; i < ws.length; i++) {
       if (ws[i].id !== 'orbiter') continue;
       const st = ws[i].state, pos = st.positions, br = st.bodyR || 12;
@@ -308,8 +401,27 @@
 
   // Player = Ace, a pixel-art space fighter drawn billboard-style (upright, flips L/R).
   // Walk-animates when moving; armour tier swaps the sprite (basic / armored / heavy).
-  function drawPlayer(ctx, game) {
-    const p = game.player, r = p.r, TAU = Engine.TAU, S = global.Sprites;
+  function drawPlayers(ctx, game) {
+    const players = game.players || [game.player];
+    for (const p of players) drawPlayer(ctx, game, p);
+  }
+  function drawPlayer(ctx, game, p) {
+    const r = p.r, TAU = Engine.TAU, S = global.Sprites;
+    if (p.dead) { // downed partner: a fading beacon where they fell
+      ctx.save(); ctx.globalAlpha = 0.5 + 0.3 * Math.sin(game.timeSec * 6);
+      ctx.strokeStyle = '#7fd8ff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke();
+      ctx.font = '10px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#7fd8ff';
+      ctx.fillText(Math.ceil(p.respawn) + 's', p.x, p.y - r - 6);
+      ctx.textAlign = 'start'; ctx.restore();
+      return;
+    }
+    // co-op: ring under the partner so the two fighters read apart
+    if (game.players && game.players.length > 1 && p !== game.localPlayer) {
+      ctx.save(); ctx.strokeStyle = 'rgba(255,209,102,0.75)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y + r * 0.95, r * 1.05, r * 0.45, 0, 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
 
     // drop shadow at the feet
     ctx.save();
@@ -395,7 +507,7 @@
   }
 
   function drawXpBar(ctx, game) {
-    const p = game.player, W = global.Engine.width;
+    const p = game.localPlayer || game.player, W = global.Engine.width;
     const frac = p.xpNext > 0 ? p.xp / p.xpNext : 0;
     ctx.fillStyle = 'rgba(56,232,255,0.15)'; ctx.fillRect(0, 0, W, 4);
     ctx.fillStyle = '#38e8ff'; ctx.fillRect(0, 0, W * Engine.clamp(frac, 0, 1), 4);
@@ -437,7 +549,7 @@
   }
 
   function drawHUDOverlay(ctx, game) {
-    const p = game.player, W = global.Engine.width;
+    const p = game.localPlayer || game.player, W = global.Engine.width;
     // HP bar (screen space)
     const bw = Math.min(280, W - 40), bx = (W - bw) / 2, by = 44, bh = 10;
     ctx.fillStyle = 'rgba(255,90,110,0.18)';
@@ -479,14 +591,14 @@
     if (!b || b.life <= 0) return;
     ctx.save();
     ctx.globalAlpha = Math.min(1, b.life);
-    ctx.fillStyle = '#ff5a6e'; ctx.font = 'bold 22px system-ui'; ctx.textAlign = 'center';
+    ctx.fillStyle = b.color || '#ff5a6e'; ctx.font = 'bold 18px system-ui'; ctx.textAlign = 'center';
     ctx.fillText(b.text, global.Engine.width / 2, global.Engine.height * 0.26);
     ctx.restore(); ctx.textAlign = 'start';
   }
 
   function drawEscapeArrow(ctx, game) {
     if (game.phase !== 'ESCAPE') return;
-    const ex = game.map.exit, p = game.player;
+    const ex = game.map.exit, p = game.localPlayer || game.player;
     const s = global.Engine.worldToScreen(ex.x, ex.y);
     const W = global.Engine.width, H = global.Engine.height, m = 44;
     if (s.x > m && s.x < W - m && s.y > m && s.y < H - m) return; // on screen
@@ -509,18 +621,21 @@
     ctx.save();
     ctx.translate(Math.round(W / 2 - cam.x + shx), Math.round(H / 2 - cam.y + shy)); // world space
     drawMap(ctx, game);
+    drawVents(ctx, game);
     drawExit(ctx, game);
+    drawCaches(ctx, game);
     drawCrystals(ctx, game);
     drawPickups(ctx, game);
     drawMines(ctx, game);
     drawSlams(ctx, game);
+    drawSurvivors(ctx, game);
     drawProjectiles(ctx, game);
     drawEnemyProjectiles(ctx, game);
     drawSentries(ctx, game);
     drawEnemies(ctx, game);
     drawOrbiters(ctx, game);
     drawEffectsWorld(ctx, game);
-    drawPlayer(ctx, game);
+    drawPlayers(ctx, game);
     if (global.Particles) global.Particles.draw(ctx, game);
     ctx.restore();
 

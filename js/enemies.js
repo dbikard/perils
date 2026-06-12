@@ -9,6 +9,9 @@
     hulk:     { r: 18, hp: 78,  speed: 38,  damage: 16, xp: 4, color: '#c0466e', shape: 'square' },
     spitter:  { r: 11, hp: 20,  speed: 50,  damage: 5,  xp: 2, color: '#ffb347', shape: 'diamond',
                 ranged: true, fireRange: 340, fireCd: 2.4, projSpeed: 210, projDmg: 9 },
+    // wraith (Helios Station): phases straight through bulkheads — corridors
+    // are not cover against it, and weapons can't target it behind walls
+    wraith:   { r: 11, hp: 30,  speed: 64,  damage: 11, xp: 3, color: '#c48eff', shape: 'circle', ghost: true },
     // boss: collision radius must fit the 2-tile (64px) corridors; drawn larger.
     // Its mortar slams arc over walls — cover blocks bullets, not the barrage.
     boss:     { r: 26, hp: 700, speed: 44, damage: 24, xp: 30, color: '#ff3b5e', shape: 'square', boss: true,
@@ -21,7 +24,8 @@
     // gentle linear HP growth, then a quadratic late-game wall (a maxed build
     // should still feel hunted at minute 5 — threat must outpace power slightly)
     const t = game.timeSec;
-    const hpScale = 1 + t * 0.007 + Math.max(0, t - 150) * Math.max(0, t - 150) * 0.0001;
+    const hpScale = (1 + t * 0.007 + Math.max(0, t - 150) * Math.max(0, t - 150) * 0.0003)
+      * ((game.stageDef && game.stageDef.hpMult) || 1);
     const dmgScale = 1 + game.timeSec * 0.003;
     e.type = typeId; e.x = x; e.y = y; e.r = def.r;
     e.maxHp = def.hp * hpScale; e.hp = e.maxHp;
@@ -32,6 +36,7 @@
     e.fireTimer = def.fireCd ? def.fireCd * 0.5 : 0;
     e.projSpeed = def.projSpeed || 0; e.projDmg = (def.projDmg || 0) * dmgScale;
     e.boss = !!def.boss;
+    e.ghost = !!def.ghost;
     if (def.boss) {
       e.slamCd = def.slamCd; e.slamRange = def.slamRange; e.slamRadius = def.slamRadius;
       e.slamDmg = def.slamDmg * dmgScale;
@@ -48,6 +53,19 @@
     return e;
   }
 
+  // nearest living player to (x,y); falls back to player 0 if everyone is down
+  function nearestLivingPlayer(game, x, y) {
+    const players = game.players || [game.player];
+    let best = null, bestD2 = Infinity;
+    for (let i = 0; i < players.length; i++) {
+      const p = players[i];
+      if (p.dead) continue;
+      const d2 = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+      if (d2 < bestD2) { bestD2 = d2; best = p; }
+    }
+    return best || players[0];
+  }
+
   function fireEnemyProjectile(game, e, dx, dy) {
     const l = Math.hypot(dx, dy) || 1;
     const ep = game.enemyProjectiles.spawn();
@@ -56,11 +74,14 @@
   }
 
   function updateMovement(game, dt) {
-    const p = game.player, map = game.map, ff = game.ff, list = game.enemies.active;
+    const map = game.map, list = game.enemies.active;
+    const players = game.players || [game.player];
     const slow = game.enemySlow > 0 ? 0.4 : 1;
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       if (e.hitFlash > 0) e.hitFlash -= dt;
+      const p = nearestLivingPlayer(game, e.x, e.y);
+      const ff = (p.idx === 1 && game.ff2) ? game.ff2 : game.ff;
 
       if (e.stun > 0) {
         e.stun -= dt;
@@ -73,7 +94,12 @@
             if (e.fireTimer <= 0) { e.fireTimer = e.fireCd; fireEnemyProjectile(game, e, dx, dy); }
           }
         }
-        if (!hold) {
+        if (!hold && e.ghost) {
+          // wraiths drift straight at the player, walls be damned
+          const dx = p.x - e.x, dy = p.y - e.y, l = Math.hypot(dx, dy) || 1;
+          e.x += dx / l * e.speed * slow * dt;
+          e.y += dy / l * e.speed * slow * dt;
+        } else if (!hold) {
           const tx = Math.floor(e.x / map.tile), ty = Math.floor(e.y / map.tile);
           let dir = ff.dirAtTile(tx, ty), dx = dir.x, dy = dir.y;
           if (dx === 0 && dy === 0) { dx = p.x - e.x; dy = p.y - e.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l; }
@@ -104,23 +130,32 @@
         }
       }
 
-      // contact damage
-      const pr = e.r + p.r;
-      if ((e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y) < pr * pr) {
-        game.damagePlayer(e.damage * dt);
+      // contact damage (any living player in reach)
+      for (let k = 0; k < players.length; k++) {
+        const pk = players[k];
+        if (pk.dead) continue;
+        const pr = e.r + pk.r;
+        if ((e.x - pk.x) * (e.x - pk.x) + (e.y - pk.y) * (e.y - pk.y) < pr * pr) {
+          game.damagePlayer(pk, e.damage * dt);
+        }
       }
     }
   }
 
   // telegraphed boss mortar blasts: detonate after the delay, walls don't help
   function updateSlams(game, dt) {
-    const list = game.slams, p = game.player;
+    const list = game.slams;
+    const players = game.players || [game.player];
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i];
       s.t += dt;
       if (s.t < s.delay) continue;
-      const rr = s.radius + p.r * 0.5;
-      if ((p.x - s.x) * (p.x - s.x) + (p.y - s.y) * (p.y - s.y) < rr * rr) game.damagePlayer(s.damage);
+      for (let k = 0; k < players.length; k++) {
+        const p = players[k];
+        if (p.dead) continue;
+        const rr = s.radius + p.r * 0.5;
+        if ((p.x - s.x) * (p.x - s.x) + (p.y - s.y) * (p.y - s.y) < rr * rr) game.damagePlayer(p, s.damage);
+      }
       game.addEffect({ type: 'ring', x: s.x, y: s.y, r0: 12, r1: s.radius, life: 0.32, maxLife: 0.32, color: '#ff3b5e' });
       if (global.Particles) global.Particles.burst(game, s.x, s.y, '#ff3b5e', 12, 200);
       if (global.SFX) global.SFX.hit();
@@ -130,21 +165,28 @@
   }
 
   function updateEnemyProjectiles(game, dt) {
-    const list = game.enemyProjectiles.active, map = game.map, p = game.player;
+    const list = game.enemyProjectiles.active, map = game.map;
+    const players = game.players || [game.player];
     for (let i = list.length - 1; i >= 0; i--) {
       const ep = list[i];
       ep.x += ep.vx * dt; ep.y += ep.vy * dt; ep.life -= dt;
       if (ep.life <= 0 || map.isWallWorld(ep.x, ep.y)) { game.enemyProjectiles.release(ep); continue; }
-      const rr = ep.r + p.r;
-      if ((ep.x - p.x) * (ep.x - p.x) + (ep.y - p.y) * (ep.y - p.y) < rr * rr) {
-        game.damagePlayer(ep.damage);
-        game.enemyProjectiles.release(ep);
+      for (let k = 0; k < players.length; k++) {
+        const p = players[k];
+        if (p.dead) continue;
+        const rr = ep.r + p.r;
+        if ((ep.x - p.x) * (ep.x - p.x) + (ep.y - p.y) * (ep.y - p.y) < rr * rr) {
+          game.damagePlayer(p, ep.damage);
+          game.enemyProjectiles.release(ep);
+          break;
+        }
       }
     }
   }
 
   function pickType(game) {
     const t = game.timeSec, r = game.rng();
+    if (game.stageDef && game.stageDef.wraiths && t > 45 && r < 0.22) return 'wraith';
     if (t > 240) { // late mix punishes pure kiting: ranged + fast dominate
       if (r < 0.15) return 'hulk';
       if (r < 0.50) return 'spitter';
@@ -158,9 +200,14 @@
   }
 
   function spawnRing(game) {
-    const p = game.player;
-    const diag = Math.hypot(E.width, E.height);
-    return game.map.randomFloorRingWorld(game.rng, p.x, p.y, diag * 0.5 + 40, diag * 0.5 + 320);
+    // centred between living players; virtual view dims keep co-op peers identical
+    const players = game.players || [game.player];
+    let cx = 0, cy = 0, n = 0;
+    for (const p of players) if (!p.dead) { cx += p.x; cy += p.y; n++; }
+    if (!n) { cx = players[0].x; cy = players[0].y; n = 1; }
+    cx /= n; cy /= n;
+    const diag = Math.hypot(game.viewW || E.width, game.viewH || E.height);
+    return game.map.randomFloorRingWorld(game.rng, cx, cy, diag * 0.5 + 40, diag * 0.5 + 320);
   }
 
   function updateSpawning(game, dt) {
@@ -185,11 +232,12 @@
     // pressure/release: ramping spawn rate with a surge at the top of each
     // minute and a lull at the end (breathe, collect XP) — flow theory.
     // enemies/sec: shallow ramp through the midgame, sharp ramp after 3min
-    let rate = 0.85 + t * 0.009 + Math.max(0, t - 180) * 0.022; // 0.85 → ~2.5 @3min → ~6.2 @5min
+    let rate = 0.85 + t * 0.010 + Math.max(0, t - 180) * 0.022; // 0.85 → ~2.7 @3min → ~6.5 @5min
     const phase = t % 60;
     if (phase >= 48) rate *= 0.35;           // lull
     else if (t > 60 && phase < 8) rate *= 1.4; // surge
     if (escaping) rate *= 2.5;               // the escape is the hardest moment by design
+    rate *= (game.stageDef && game.stageDef.rateMult) || 1;
     const batch = 1 + Math.floor(t / 75);
     game.spawnTimer += batch / rate;
     if (game.enemies.count >= MAX) return;
@@ -198,8 +246,9 @@
       // late game, some hostiles crawl out of the vents anywhere on the ship —
       // open space stops being guaranteed-safe, so pure kiting isn't enough
       const vent = (t > 150 || escaping) && game.rng.chance(escaping ? 0.55 : 0.35);
+      const anchor = nearestLivingPlayer(game, game.players ? game.players[0].x : 0, game.players ? game.players[0].y : 0);
       const pos = vent
-        ? game.map.randomFloorRingWorld(game.rng, game.player.x, game.player.y, 280, 1e9)
+        ? game.map.randomFloorRingWorld(game.rng, anchor.x, anchor.y, 280, 1e9)
         : spawnRing(game);
       const elite = t > 90 && game.rng.chance(0.04);
       spawnEnemy(game, pickType(game), pos.x, pos.y, elite);

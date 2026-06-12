@@ -24,6 +24,7 @@
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+    fn.getState = () => a >>> 0;   // expose for sync hashing (co-op desync checks)
     fn.range = (lo, hi) => lo + fn() * (hi - lo);
     fn.int = (lo, hi) => Math.floor(lo + fn() * (hi - lo + 1)); // inclusive
     fn.pick = (arr) => arr[Math.floor(fn() * arr.length)];

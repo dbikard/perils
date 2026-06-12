@@ -37,12 +37,19 @@ let ablated = new Set();
 globalThis.UI = {
   layoutButtons() {},
   openLevelUp(game) {
+    const p = game.players ? game.players[0] : game.player;
     while (game.pendingLevels > 0) {
-      const choices = globalThis.Upgrades.generateChoices(game, 3);
+      const choices = globalThis.Upgrades.generateChoices(game, 3, p);
       const pick = activeBot.pick(game, choices) || choices[0];
-      globalThis.Upgrades.applyChoice(game, pick);
+      globalThis.Upgrades.applyChoice(game, pick, p);
       game.pendingLevels--;
     }
+    p.pendingLevels = 0;
+  },
+  openCache(game, choices) {
+    const p = game.players ? game.players[0] : game.player;
+    const pick = activeBot.pick(game, choices) || choices[0];
+    globalThis.Upgrades.applyChoice(game, pick, p);
   }
 };
 
@@ -63,6 +70,50 @@ function nearestCrystal(game, maxR) {
     if (score > bestScore) { bestScore = score; best = c; }
   }
   return best;
+}
+
+// points of interest on the map: untaken weapon caches and waiting survivors.
+// Navigated via a flow field (they sit in far rooms, often behind walls).
+function poiDir(game, st) {
+  const p = game.player;
+  let best = null, bestD = Infinity;
+  for (const c of (game.caches || [])) {
+    if (c.taken) continue;
+    const d = Math.hypot(c.x - p.x, c.y - p.y);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  for (const s of (game.survivors || [])) {
+    if (s.state !== 'waiting') continue;
+    const d = Math.hypot(s.x - p.x, s.y - p.y) * 1.4; // caches slightly preferred
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  if (!best) return null;
+  if (!st.poiFF || st.poiTarget !== best) {
+    st.poiFF = st.poiFF || new E.FlowField(game.map);
+    const t = game.map.tileAtWorld(best.x, best.y);
+    st.poiFF.compute(t.tx, t.ty);
+    st.poiTarget = best;
+  }
+  const t = game.map.tileAtWorld(p.x, p.y);
+  const d = st.poiFF.dirAtTile(t.tx, t.ty);
+  if (d.x === 0 && d.y === 0) {
+    const l = Math.hypot(best.x - p.x, best.y - p.y) || 1;
+    return { x: (best.x - p.x) / l, y: (best.y - p.y) / l };
+  }
+  return d;
+}
+
+// active vents (and warnings) repel careful bots
+function ventThreat(game, threat) {
+  const p = game.player;
+  for (const v of (game.vents || [])) {
+    if (v.phase === 'idle') continue;
+    const dx = p.x - v.x, dy = p.y - v.y, d = Math.hypot(dx, dy);
+    if (d < 150 && d > 1) {
+      const w = (v.phase === 'venting' ? 2.0 : 1.0) * (1 - d / 150);
+      threat.x += dx / d * w; threat.y += dy / d * w;
+    }
+  }
 }
 
 function threatVector(game, radius) {
@@ -193,9 +244,13 @@ function makeBots(seed) {
         if (c) { const dx = c.x - p.x, dy = c.y - p.y, l = Math.hypot(dx, dy) || 1;
           dir = { x: dx / l + threat.x * 0.6, y: dy / l + threat.y * 0.6 }; }
         else {
-          // wander to a random floor point until a crystal shows up
-          if (!st.tgt || Math.hypot(st.tgt.x - p.x, st.tgt.y - p.y) < 40) st.tgt = game.map.randomFloorWorld(rng);
-          dir = { x: st.tgt.x - p.x, y: st.tgt.y - p.y };
+          // no crystals around: loot caches / answer distress calls, else wander
+          const pd = poiDir(game, st);
+          if (pd) dir = pd;
+          else {
+            if (!st.tgt || Math.hypot(st.tgt.x - p.x, st.tgt.y - p.y) < 40) st.tgt = game.map.randomFloorWorld(rng);
+            dir = { x: st.tgt.x - p.x, y: st.tgt.y - p.y };
+          }
         }
         setMove(steer(game, dir));
       }
@@ -238,9 +293,13 @@ function makeBots(seed) {
             dir.y = ed.y * 1.6 + threat.y * 0.9;
           }
         } else {
+          ventThreat(game, threat);
           const danger = Math.hypot(threat.x, threat.y);
           const c = nearestCrystal(game, 520);
-          if (c && danger < 1.6) {
+          const pd = danger < 0.5 ? poiDir(game, st) : null; // loot/rescue runs only when calm
+          if (pd) {
+            dir.x = pd.x + threat.x * 1.2; dir.y = pd.y + threat.y * 1.2;
+          } else if (c && danger < 1.6) {
             const dx = c.x - p.x, dy = c.y - p.y, l = Math.hypot(dx, dy) || 1;
             dir.x = dx / l + threat.x * 1.1; dir.y = dy / l + threat.y * 1.1;
           } else if (danger > 0.05) {
@@ -265,7 +324,7 @@ function playRun(botName, seed, opts) {
   const bot = bots[botName];
   activeBot = bot;
   bot.st = {};
-  Run.startGame({ seed });
+  Run.startGame({ seed, stage: opts.stage });
   const game = Run.game;
   const trace = [];
 
@@ -284,9 +343,12 @@ function playRun(botName, seed, opts) {
   if (opts.trace) {
     for (const s of trace) console.log(`    t=${String(s.t).padStart(3)}s hp=${String(s.hp).padStart(3)} lv=${String(s.lv).padStart(2)} enemies=${String(s.enemies).padStart(3)} kills=${String(s.kills).padStart(4)} warp=${s.warp}%`);
     console.log(`    weapons: ${game.player.weapons.map(w => `${w.id}:${w.level}`).join(' ')}  special: ${game.player.special ? game.player.special.id + ':' + game.player.special.level : '—'}`);
-    console.log(`    passives: ${Object.entries(game.upgradeLevels).map(([k, v]) => `${k}:${v}`).join(' ') || '—'}`);
+    console.log(`    passives: ${Object.entries(game.player.upgradeLevels).map(([k, v]) => `${k}:${v}`).join(' ') || '—'}`);
+    console.log(`    caches looted: ${game.caches.filter(c => c.taken).length}/${game.caches.length}  crew: ${game.survivors.map(s => s.name + '=' + s.state).join(' ') || '—'}`);
   }
-  return { time: game.timeSec, escaped, level: game.player.level, kills: game.kills, seed };
+  return { time: game.timeSec, escaped, level: game.player.level, kills: game.kills, seed,
+    caches: game.caches.filter(c => c.taken).length,
+    rescued: game.survivors.filter(s => s.state === 'following').length };
 }
 
 function median(arr) { const s = [...arr].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
@@ -303,7 +365,9 @@ function runBatch(botName, runs, seed0, opts) {
     escapePct: Math.round(100 * esc / runs),
     medTime: median(times), p25: quartile(times, 0.25), p75: quartile(times, 0.75),
     medLevel: median(results.map(r => r.level)),
-    medKills: median(results.map(r => r.kills))
+    medKills: median(results.map(r => r.kills)),
+    medCaches: median(results.map(r => r.caches)),
+    medRescued: median(results.map(r => r.rescued))
   };
   // death-time histogram (30s buckets, escapes excluded)
   const hist = new Array(Math.ceil(MAX_TIME / 30)).fill(0);
@@ -314,7 +378,7 @@ function runBatch(botName, runs, seed0, opts) {
 
 function printSummary(s) {
   console.log(`  ${s.bot.padEnd(8)} runs=${s.runs}  escape=${String(s.escapePct).padStart(3)}%  ` +
-    `survival med=${fmt(s.medTime)} (p25=${fmt(s.p25)} p75=${fmt(s.p75)})  lv=${s.medLevel}  kills=${s.medKills}`);
+    `survival med=${fmt(s.medTime)} (p25=${fmt(s.p25)} p75=${fmt(s.p75)})  lv=${s.medLevel}  kills=${s.medKills}  caches=${s.medCaches}  crew=${s.medRescued}`);
   const bars = s.hist.map(h => h === 0 ? '·' : (h < 3 ? '▂' : h < 6 ? '▄' : h < 10 ? '▆' : '█')).join('');
   console.log(`  ${' '.repeat(8)} deaths/30s: [${bars}]`);
 }
@@ -329,12 +393,26 @@ for (const a of process.argv.slice(2)) {
 const runs = parseInt(args.runs || '20', 10);
 const seed0 = parseInt(args.seed || '1', 10);
 const botNames = (args.bots || 'random,greedy,skilled').split(',');
-const opts = { trace: !!args.trace };
+const stage = parseInt(args.stage || '1', 10);
+const opts = { trace: !!args.trace, stage };
 
-console.log(`Perils sim — ${runs} run(s)/bot, seed base ${seed0}, warp=${Run.WARP_TIME}s`);
+console.log(`Perils sim — stage ${stage} (${Run.STAGES[stage].name}), ${runs} run(s)/bot, seed base ${seed0}, warp=${Run.STAGES[stage].warpTime}s`);
 console.log(`targets: random <2:00 & ~0% escape · greedy 3:00–6:00 · skilled 25–45% escape\n`);
 
-if (args.ablate) {
+if (args.determinism) {
+  // co-op lockstep requires the sim to be a pure function of (seed, inputs):
+  // play the same seeded run twice and require bit-identical outcomes
+  let ok = true;
+  for (let i = 0; i < 5; i++) {
+    const a = playRun('skilled', seed0 + i * 31, opts);
+    const b = playRun('skilled', seed0 + i * 31, opts);
+    const same = a.time === b.time && a.kills === b.kills && a.level === b.level && a.escaped === b.escaped;
+    console.log(`  seed ${a.seed}: ${same ? 'OK ' : 'DIVERGED'}  t=${a.time.toFixed(3)}/${b.time.toFixed(3)} kills=${a.kills}/${b.kills} lv=${a.level}/${b.level}`);
+    if (!same) ok = false;
+  }
+  console.log(ok ? '\ndeterminism: PASS' : '\ndeterminism: FAIL — lockstep co-op would desync');
+  process.exit(ok ? 0 : 1);
+} else if (args.ablate) {
   // ablation: disable one mechanic at a time for the skilled bot, compare to baseline
   const features = args.ablate === true ? ['blink', 'special', 'ult', 'magnet'] : args.ablate.split(',');
   ablated = new Set();

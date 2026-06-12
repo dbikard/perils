@@ -12,7 +12,7 @@
       blurb: 'Knockback + stun nearby hostiles',
       stats: (l) => ({ cd: Math.max(5, 9 - 0.7 * (l - 1)), radius: 180 + 22 * (l - 1), stun: 1.0 + 0.2 * (l - 1), push: 90 }),
       activate(game, sp) {
-        const p = game.player, s = this.stats(sp.level), R2 = s.radius * s.radius;
+        const p = sp.owner, s = this.stats(sp.level), R2 = s.radius * s.radius;
         const list = game.enemies.active;
         for (let i = 0; i < list.length; i++) {
           const e = list[i];
@@ -33,7 +33,7 @@
       blurb: 'Brief invulnerable bubble',
       stats: (l) => ({ cd: Math.max(7, 12 - 0.8 * (l - 1)), dur: 1.6 + 0.35 * (l - 1) }),
       activate(game, sp) {
-        const p = game.player, s = this.stats(sp.level);
+        const p = sp.owner, s = this.stats(sp.level);
         p.invuln = Math.max(p.invuln, s.dur);
         game.addEffect({ type: 'ring', x: p.x, y: p.y, r0: p.r + 6, r1: p.r + 38, life: 0.5, maxLife: 0.5, color: this.color });
       }
@@ -43,7 +43,7 @@
       blurb: 'Surge: +damage & +fire rate',
       stats: (l) => ({ cd: Math.max(8, 14 - 1.0 * (l - 1)), dur: 4 + 0.6 * (l - 1) }),
       activate(game, sp) {
-        const p = game.player, s = this.stats(sp.level);
+        const p = sp.owner, s = this.stats(sp.level);
         p.overload = Math.max(p.overload, s.dur);
         game.addEffect({ type: 'flash', life: 0.2, maxLife: 0.2, color: '255,209,102' });
       }
@@ -53,8 +53,8 @@
       blurb: 'Deploy an auto-firing turret',
       stats: (l) => ({ cd: Math.max(6, 12 - 1.0 * (l - 1)), life: 8 + 1.5 * (l - 1), damage: 12 + 3 * (l - 1), cdFire: 0.4, range: 320 }),
       activate(game, sp) {
-        const p = game.player, s = this.stats(sp.level);
-        game.sentries.push({ x: p.x, y: p.y, life: s.life, fire: 0, cdFire: s.cdFire, damage: s.damage, range: s.range });
+        const p = sp.owner, s = this.stats(sp.level);
+        game.sentries.push({ x: p.x, y: p.y, life: s.life, fire: 0, cdFire: s.cdFire, damage: s.damage, range: s.range, owner: p });
       }
     },
     timewarp: {
@@ -69,12 +69,10 @@
     }
   };
 
-  function blink(game) {
-    const p = game.player;
+  function blink(game, p, inp) {
     if (p.blink.cd > 0) return false;
     let dx = p.facingX, dy = p.facingY;
-    const mv = E.input.moveVector();
-    if (mv.x !== 0 || mv.y !== 0) { const l = Math.hypot(mv.x, mv.y) || 1; dx = mv.x / l; dy = mv.y / l; }
+    if (inp && (inp.mx !== 0 || inp.my !== 0)) { const l = Math.hypot(inp.mx, inp.my) || 1; dx = inp.mx / l; dy = inp.my / l; }
     const ox = p.x, oy = p.y, dist = p.blink.dist, steps = Math.ceil(dist / 6);
     let fx = p.x, fy = p.y;
     for (let i = 1; i <= steps; i++) {
@@ -91,8 +89,7 @@
     return true;
   }
 
-  function special(game) {
-    const p = game.player;
+  function special(game, p) {
     if (!p.special || p.special.cd > 0) return false;
     p.special.def.activate(game, p.special);
     p.special.cd = p.special.def.stats(p.special.level).cd;
@@ -101,11 +98,11 @@
     return true;
   }
 
-  function ultimate(game) {
-    const p = game.player;
+  function ultimate(game, p) {
     if (p.ult.charge < 1) return false;
     p.ult.charge = 0;
-    const diag = Math.hypot(E.width, E.height), R = diag * p.ult.radiusFactor, R2 = R * R;
+    // virtual view size, NOT the device screen — must match across co-op peers
+    const diag = Math.hypot(game.viewW, game.viewH), R = diag * p.ult.radiusFactor, R2 = R * R;
     const list = game.enemies.active;
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
@@ -122,12 +119,15 @@
   }
 
   function addUltCharge(game, amount) {
-    const u = game.player.ult;
-    u.charge = Math.min(1, u.charge + amount * u.mult);
+    const players = game.players || [game.player];
+    for (const p of players) {
+      p.ult.charge = Math.min(1, p.ult.charge + amount * p.ult.mult);
+    }
   }
 
-  function setSpecial(game, id) {
-    game.player.special = { id, def: SPECIALS[id], level: 1, cd: 0 };
+  function setSpecial(game, id, pl) {
+    const p = pl || game.player;
+    p.special = { id, def: SPECIALS[id], level: 1, cd: 0, owner: p };
   }
 
   function updateSentries(game, dt) {
@@ -144,30 +144,27 @@
           let dx = t.x - s.x, dy = t.y - s.y; const l = Math.hypot(dx, dy) || 1;
           const pr = game.projectiles.spawn();
           pr.x = s.x; pr.y = s.y; pr.vx = dx / l * 430; pr.vy = dy / l * 430;
-          pr.r = 4; pr.damage = s.damage * game.player.stats.damageMult; pr.life = 1.0; pr.pierce = 0; pr.color = '#54ff9f';
+          pr.r = 4; pr.damage = s.damage * (s.owner ? s.owner.stats.damageMult : 1);
+          pr.life = 1.0; pr.pierce = 0; pr.color = '#54ff9f';
         }
       }
     }
   }
 
   function update(game, dt) {
-    const p = game.player;
-    if (p.blink.cd > 0) p.blink.cd -= dt;
-    if (p.special && p.special.cd > 0) p.special.cd -= dt;
-    if (p.overload > 0) p.overload -= dt;
-
-    const taps = E.input.consumeTaps();
-    for (let i = 0; i < taps.length; i++) {
-      if (taps[i] === 'blink') blink(game);
-      else if (taps[i] === 'special') special(game);
-      else if (taps[i] === 'ultimate') ultimate(game);
-    }
-    const keys = E.input.consumeKeyTaps();
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i];
-      if (k === ' ') blink(game);
-      else if (k === 'q') special(game);
-      else if (k === 'e' || k === 'enter') ultimate(game);
+    const players = game.players || [game.player];
+    for (const p of players) {
+      if (p.blink.cd > 0) p.blink.cd -= dt;
+      if (p.special && p.special.cd > 0) p.special.cd -= dt;
+      if (p.overload > 0) p.overload -= dt;
+      if (p.dead) continue;
+      // inputs come from the per-player provider (local input in solo,
+      // lockstep buffer in co-op) — never directly from the DOM here
+      const inp = game.inputs && game.inputs[p.idx];
+      if (!inp) continue;
+      if (inp.blink) blink(game, p, inp);
+      if (inp.special) special(game, p);
+      if (inp.ult) ultimate(game, p);
     }
     updateSentries(game, dt);
   }
