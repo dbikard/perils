@@ -743,40 +743,58 @@
     global.addEventListener('keydown', (e) => { if (e.key && e.key.toLowerCase() === 'm' && global.SFX) sync(global.SFX.toggle()); });
   }
 
-  /* co-op lobby: serverless WebRTC handshake via copy-paste link codes */
+  /* co-op lobby. Primary flow: host opens a room, partner types its 4-letter
+   * code (handshake relayed through a free public signaling service; gameplay
+   * stays LAN peer-to-peer). Fallback: serverless copy-paste link codes. */
   function setupCoopMenu() {
     const Net = global.Net;
     if (!Net || typeof RTCPeerConnection === 'undefined') return;
     const $ = (id) => document.getElementById(id);
     const panel = $('coop-panel'), status = $('coop-status');
-    const out = $('coop-out'), inp = $('coop-in');
+    const out = $('coop-out'), inp = $('coop-in'), room = $('coop-room');
     const say = (s) => { if (status) status.textContent = s; };
-    let role = null;
 
     $('coop-toggle').addEventListener('click', () => panel.classList.toggle('hidden'));
+
+    // room-code flow
     $('coop-host').addEventListener('click', async () => {
-      role = 'host'; say('creating link code…');
+      say('opening room…');
+      try {
+        const code = await Net.hostRoom(say);
+        room.textContent = code;
+        say('waiting for partner — they enter this code and tap JOIN');
+      } catch (e) {
+        say('room service unreachable — use offline pairing below');
+      }
+    });
+    $('coop-join').addEventListener('click', async () => {
+      try {
+        say('joining…');
+        await Net.joinRoom($('coop-code').value);
+      } catch (e) { say(e.message); }
+    });
+
+    // offline fallback: manual link codes; the second device just pastes the
+    // first device's code and ACCEPTs — roles are inferred
+    $('coop-manual-toggle').addEventListener('click', () => $('coop-manual').classList.toggle('hidden'));
+    $('coop-mhost').addEventListener('click', async () => {
+      say('creating link code…');
       try {
         out.value = await Net.host();
-        say('1) send this code to your partner  2) paste their reply below  3) ACCEPT');
+        say('send the code to your partner; paste their reply and ACCEPT');
       } catch (e) { say('failed: ' + e.message); }
-    });
-    $('coop-join').addEventListener('click', () => {
-      role = 'join';
-      say('paste the host code below, then ACCEPT');
     });
     $('coop-accept').addEventListener('click', async () => {
       const code = inp.value.trim();
       if (!code) { say('paste a code first'); return; }
       try {
-        if (role === 'join') {
-          say('connecting…');
-          out.value = await Net.join(code);
-          say('send this reply code back to the host — connecting…');
-        } else if (role === 'host') {
-          say('connecting…');
-          await Net.acceptAnswer(code);
-        } else say('choose HOST or JOIN first');
+        say('connecting…');
+        if (Net.pc && Net.isHost) {
+          await Net.acceptAnswer(code);       // host finishing the handshake
+        } else {
+          out.value = await Net.join(code);   // guest answering the host's code
+          say('send this reply code back — connecting…');
+        }
       } catch (e) { say('bad code: ' + e.message); }
     });
     $('coop-copy').addEventListener('click', () => {
