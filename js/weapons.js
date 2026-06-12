@@ -4,9 +4,9 @@
 (function (global) {
   'use strict';
 
-  // global multipliers (passives + Overload special)
-  function eff(game) {
-    const p = game.player, o = p.overload > 0;
+  // global multipliers (passives + Overload special) for a given player
+  function eff(game, p) {
+    const o = p.overload > 0;
     return {
       dmg: p.stats.damageMult * (o ? 1.6 : 1),
       cd: p.stats.cooldownMult * (o ? 0.55 : 1),
@@ -57,8 +57,7 @@
     return best;
   }
 
-  function aimDir(game, fallbackFacing, range) {
-    const p = game.player;
+  function aimDir(game, p, fallbackFacing, range) {
     const t = findNearestEnemy(game, p.x, p.y, range, true); // line-of-sight target
     if (t) { const dx = t.x - p.x, dy = t.y - p.y, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; }
     if (fallbackFacing) { const l = Math.hypot(p.facingX, p.facingY) || 1; return { x: p.facingX / l, y: p.facingY / l }; }
@@ -72,7 +71,7 @@
       stats: (l) => ({ cooldown: Math.max(0.28, 0.6 - 0.035 * (l - 1)), damage: 14 + 6 * (l - 1),
         count: 1 + Math.floor((l - 1) / 3), pierce: Math.floor((l - 1) / 4), speed: 470, projR: 5, life: 1.3, range: 520 }),
       update(game, w, dt) {
-        const p = game.player, e = eff(game), s = this.stats(w.level);
+        const p = w.owner, e = eff(game, p), s = this.stats(w.level);
         w.timer -= dt; if (w.timer > 0) return; w.timer += s.cooldown * e.cd;
         const count = s.count + e.extra;
         const targets = findNearestEnemies(game, p.x, p.y, s.range, count, true);
@@ -96,9 +95,9 @@
       stats: (l) => ({ cooldown: Math.max(0.5, 0.95 - 0.04 * (l - 1)), damage: 8 + 3 * (l - 1),
         pellets: 4 + Math.floor((l - 1) / 2), spread: 0.75, speed: 430, projR: 4, life: 0.42 }),
       update(game, w, dt) {
-        const p = game.player, e = eff(game), s = this.stats(w.level);
+        const p = w.owner, e = eff(game, p), s = this.stats(w.level);
         w.timer -= dt; if (w.timer > 0) return; w.timer += s.cooldown * e.cd;
-        const dir = aimDir(game, true, 560); if (!dir) return;
+        const dir = aimDir(game, p, true, 560); if (!dir) return;
         const base = Math.atan2(dir.y, dir.x), pellets = s.pellets + e.extra, dmg = s.damage * e.dmg;
         for (let i = 0; i < pellets; i++) {
           const t = pellets === 1 ? 0.5 : i / (pellets - 1);
@@ -116,7 +115,7 @@
       stats: (l) => ({ cooldown: Math.max(0.6, 1.2 - 0.06 * (l - 1)), damage: 12 + 5 * (l - 1),
         chains: 2 + Math.floor((l - 1) / 2), jump: 160, range: 360 }),
       update(game, w, dt) {
-        const p = game.player, e = eff(game), s = this.stats(w.level);
+        const p = w.owner, e = eff(game, p), s = this.stats(w.level);
         w.timer -= dt; if (w.timer > 0) return; w.timer += s.cooldown * e.cd;
         let cur = findNearestEnemy(game, p.x, p.y, s.range, true);
         if (!cur) { w.timer = Math.min(w.timer, 0.15); return; }
@@ -140,9 +139,9 @@
       stats: (l) => ({ cooldown: Math.max(0.7, 1.4 - 0.07 * (l - 1)), damage: 20 + 9 * (l - 1),
         width: 10 + 2 * (l - 1), range: 540 }),
       update(game, w, dt) {
-        const p = game.player, e = eff(game), s = this.stats(w.level);
+        const p = w.owner, e = eff(game, p), s = this.stats(w.level);
         w.timer -= dt; if (w.timer > 0) return; w.timer += s.cooldown * e.cd;
-        const dir = aimDir(game, false, s.range); if (!dir) { w.timer = Math.min(w.timer, 0.15); return; }
+        const dir = aimDir(game, p, false, s.range); if (!dir) { w.timer = Math.min(w.timer, 0.15); return; }
         const dmg = s.damage * e.dmg, half = s.width / 2;
         const ex = p.x + dir.x * s.range, ey = p.y + dir.y * s.range;
         game.addEffect({ type: 'trail', x0: p.x, y0: p.y, x1: ex, y1: ey, life: 0.12, maxLife: 0.12, color: this.color });
@@ -166,7 +165,7 @@
       stats: (l) => ({ bodies: 2 + Math.floor((l - 1) / 2), dps: 26 + 9 * (l - 1),
         radius: 72 + 4 * (l - 1), bodyR: 12, spin: 2.2 }),
       update(game, w, dt) {
-        const p = game.player, e = eff(game), s = this.stats(w.level);
+        const p = w.owner, e = eff(game, p), s = this.stats(w.level);
         w.state.angle = (w.state.angle || 0) + s.spin * dt;
         const n = s.bodies, dps = s.dps * e.dmg * dt;
         const pos = w.state.positions || (w.state.positions = []);
@@ -193,7 +192,7 @@
       stats: (l) => ({ cooldown: Math.max(0.8, 1.8 - 0.08 * (l - 1)), damage: 36 + 12 * (l - 1),
         radius: 55 + 4 * (l - 1), triggerR: 24, life: 16 }),
       update(game, w, dt) {
-        const p = game.player, s = this.stats(w.level), e = eff(game);
+        const p = w.owner, s = this.stats(w.level), e = eff(game, p);
         w.timer -= dt; if (w.timer > 0) return; w.timer += s.cooldown * e.cd;
         const m = game.mines.spawn();
         m.x = p.x; m.y = p.y; m.r = 7; m.arm = 0.4; m.damage = s.damage * e.dmg;
@@ -202,15 +201,20 @@
     }
   };
 
-  function acquire(game, id) {
-    if (game.player.weapons.some(w => w.id === id)) return false;
-    game.player.weapons.push({ id, def: WEAPONS[id], level: 1, timer: 0, state: {} });
+  function acquire(game, id, pl) {
+    const p = pl || game.player;
+    if (p.weapons.some(w => w.id === id)) return false;
+    p.weapons.push({ id, def: WEAPONS[id], level: 1, timer: 0, state: {}, owner: p });
     return true;
   }
 
   function update(game, dt) {
-    const ws = game.player.weapons;
-    for (let i = 0; i < ws.length; i++) ws[i].def.update(game, ws[i], dt);
+    const players = game.players || [game.player];
+    for (let k = 0; k < players.length; k++) {
+      if (players[k].dead) continue;
+      const ws = players[k].weapons;
+      for (let i = 0; i < ws.length; i++) ws[i].def.update(game, ws[i], dt);
+    }
   }
 
   function updateProjectiles(game, dt) {

@@ -22,8 +22,12 @@
     get count() { return this.active.length; }
   }
 
-  function createPlayer() {
+  function createPlayer(idx) {
     return {
+      idx: idx || 0,        // player slot (0 = host/solo, 1 = co-op partner)
+      dead: false, respawn: 0,
+      pendingLevels: 0,
+      upgradeLevels: {},
       x: 0, y: 0, r: 13,
       hp: 100, maxHp: 100,
       speed: 175,           // base px/s (scaled by stats.speedMult)

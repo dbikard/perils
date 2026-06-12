@@ -7,7 +7,7 @@
 
   /* ---- ability buttons (screen-space; registered as input action regions) ---- */
   UI.layoutButtons = function (game) {
-    const W = E.width, H = E.height, p = game.player;
+    const W = E.width, H = E.height, p = game.localPlayer || game.player;
     const sp = p.special;
     UI.buttons = [
       { id: 'ultimate', x: W - 70, y: H - 86, r: 42, icon: '⚡', color: '#ffd166', locked: false,
@@ -34,7 +34,7 @@
   UI.openLevelUp = function (game) {
     E.paused = true;
     E.input.joyActive = false; // drop any in-progress joystick
-    game._choices = global.Upgrades.generateChoices(game, 3);
+    game._choices = global.Upgrades.generateChoices(game, 3, game.players ? game.players[0] : game.player);
     const cont = document.getElementById('levelup');
     let html = `<div class="lvlup-inner"><div class="lvlup-head">LEVEL ${game.player.level}</div>`
       + `<div class="lvlup-sub">Choose an upgrade</div><div class="lvlup-cards">`;
@@ -85,15 +85,43 @@
   };
 
   UI.pick = function (game, i) {
+    const p0 = game.players ? game.players[0] : game.player;
     const choice = game._choices[i];
-    if (choice) global.Upgrades.applyChoice(game, choice);
-    game.pendingLevels--;
+    if (choice) global.Upgrades.applyChoice(game, choice, p0);
+    game.pendingLevels--; p0.pendingLevels = game.pendingLevels;
     if (game.pendingLevels > 0) {
       UI.openLevelUp(game); // queue next level
     } else {
       document.getElementById('levelup').classList.add('hidden');
       E.paused = false;
     }
+  };
+
+  /* ---- co-op choice sheet: never pauses; the pick syncs via lockstep ---- */
+  UI.openChoiceMP = function (game, item, onPick) {
+    const cont = document.getElementById('levelup');
+    const head = item.kind === 'cache' ? 'WEAPON CACHE' : `LEVEL ${(game.localPlayer || game.player).level}`;
+    let html = `<div class="lvlup-inner mp"><div class="lvlup-head">${head}</div>`
+      + `<div class="lvlup-sub">Pick — the fight continues!</div><div class="lvlup-cards">`;
+    item.choices.forEach((c, i) => {
+      html += `<button class="lvlup-card" data-i="${i}" style="--c:${c.color}">`
+        + `<div class="lvlup-icon">${c.icon}</div>`
+        + `<div class="lvlup-text">`
+        + `<div class="lvlup-tag">${c.tag || ''}</div>`
+        + `<div class="lvlup-name">${c.name}</div>`
+        + `<div class="lvlup-desc">${c.desc}</div>`
+        + `</div></button>`;
+    });
+    html += `</div></div>`;
+    cont.innerHTML = html;
+    cont.classList.remove('hidden');
+    cont.classList.add('mp');
+    cont.querySelectorAll('.lvlup-card').forEach(btn =>
+      btn.addEventListener('click', () => {
+        cont.classList.add('hidden');
+        cont.classList.remove('mp');
+        onPick(parseInt(btn.dataset.i, 10));
+      }));
   };
 
   global.UI = UI;

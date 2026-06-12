@@ -53,6 +53,19 @@
     return e;
   }
 
+  // nearest living player to (x,y); falls back to player 0 if everyone is down
+  function nearestLivingPlayer(game, x, y) {
+    const players = game.players || [game.player];
+    let best = null, bestD2 = Infinity;
+    for (let i = 0; i < players.length; i++) {
+      const p = players[i];
+      if (p.dead) continue;
+      const d2 = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+      if (d2 < bestD2) { bestD2 = d2; best = p; }
+    }
+    return best || players[0];
+  }
+
   function fireEnemyProjectile(game, e, dx, dy) {
     const l = Math.hypot(dx, dy) || 1;
     const ep = game.enemyProjectiles.spawn();
@@ -61,11 +74,14 @@
   }
 
   function updateMovement(game, dt) {
-    const p = game.player, map = game.map, ff = game.ff, list = game.enemies.active;
+    const map = game.map, list = game.enemies.active;
+    const players = game.players || [game.player];
     const slow = game.enemySlow > 0 ? 0.4 : 1;
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       if (e.hitFlash > 0) e.hitFlash -= dt;
+      const p = nearestLivingPlayer(game, e.x, e.y);
+      const ff = (p.idx === 1 && game.ff2) ? game.ff2 : game.ff;
 
       if (e.stun > 0) {
         e.stun -= dt;
@@ -114,23 +130,32 @@
         }
       }
 
-      // contact damage
-      const pr = e.r + p.r;
-      if ((e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y) < pr * pr) {
-        game.damagePlayer(e.damage * dt);
+      // contact damage (any living player in reach)
+      for (let k = 0; k < players.length; k++) {
+        const pk = players[k];
+        if (pk.dead) continue;
+        const pr = e.r + pk.r;
+        if ((e.x - pk.x) * (e.x - pk.x) + (e.y - pk.y) * (e.y - pk.y) < pr * pr) {
+          game.damagePlayer(pk, e.damage * dt);
+        }
       }
     }
   }
 
   // telegraphed boss mortar blasts: detonate after the delay, walls don't help
   function updateSlams(game, dt) {
-    const list = game.slams, p = game.player;
+    const list = game.slams;
+    const players = game.players || [game.player];
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i];
       s.t += dt;
       if (s.t < s.delay) continue;
-      const rr = s.radius + p.r * 0.5;
-      if ((p.x - s.x) * (p.x - s.x) + (p.y - s.y) * (p.y - s.y) < rr * rr) game.damagePlayer(s.damage);
+      for (let k = 0; k < players.length; k++) {
+        const p = players[k];
+        if (p.dead) continue;
+        const rr = s.radius + p.r * 0.5;
+        if ((p.x - s.x) * (p.x - s.x) + (p.y - s.y) * (p.y - s.y) < rr * rr) game.damagePlayer(p, s.damage);
+      }
       game.addEffect({ type: 'ring', x: s.x, y: s.y, r0: 12, r1: s.radius, life: 0.32, maxLife: 0.32, color: '#ff3b5e' });
       if (global.Particles) global.Particles.burst(game, s.x, s.y, '#ff3b5e', 12, 200);
       if (global.SFX) global.SFX.hit();
@@ -140,15 +165,21 @@
   }
 
   function updateEnemyProjectiles(game, dt) {
-    const list = game.enemyProjectiles.active, map = game.map, p = game.player;
+    const list = game.enemyProjectiles.active, map = game.map;
+    const players = game.players || [game.player];
     for (let i = list.length - 1; i >= 0; i--) {
       const ep = list[i];
       ep.x += ep.vx * dt; ep.y += ep.vy * dt; ep.life -= dt;
       if (ep.life <= 0 || map.isWallWorld(ep.x, ep.y)) { game.enemyProjectiles.release(ep); continue; }
-      const rr = ep.r + p.r;
-      if ((ep.x - p.x) * (ep.x - p.x) + (ep.y - p.y) * (ep.y - p.y) < rr * rr) {
-        game.damagePlayer(ep.damage);
-        game.enemyProjectiles.release(ep);
+      for (let k = 0; k < players.length; k++) {
+        const p = players[k];
+        if (p.dead) continue;
+        const rr = ep.r + p.r;
+        if ((ep.x - p.x) * (ep.x - p.x) + (ep.y - p.y) * (ep.y - p.y) < rr * rr) {
+          game.damagePlayer(p, ep.damage);
+          game.enemyProjectiles.release(ep);
+          break;
+        }
       }
     }
   }
@@ -169,9 +200,14 @@
   }
 
   function spawnRing(game) {
-    const p = game.player;
-    const diag = Math.hypot(E.width, E.height);
-    return game.map.randomFloorRingWorld(game.rng, p.x, p.y, diag * 0.5 + 40, diag * 0.5 + 320);
+    // centred between living players; virtual view dims keep co-op peers identical
+    const players = game.players || [game.player];
+    let cx = 0, cy = 0, n = 0;
+    for (const p of players) if (!p.dead) { cx += p.x; cy += p.y; n++; }
+    if (!n) { cx = players[0].x; cy = players[0].y; n = 1; }
+    cx /= n; cy /= n;
+    const diag = Math.hypot(game.viewW || E.width, game.viewH || E.height);
+    return game.map.randomFloorRingWorld(game.rng, cx, cy, diag * 0.5 + 40, diag * 0.5 + 320);
   }
 
   function updateSpawning(game, dt) {
@@ -210,8 +246,9 @@
       // late game, some hostiles crawl out of the vents anywhere on the ship —
       // open space stops being guaranteed-safe, so pure kiting isn't enough
       const vent = (t > 150 || escaping) && game.rng.chance(escaping ? 0.55 : 0.35);
+      const anchor = nearestLivingPlayer(game, game.players ? game.players[0].x : 0, game.players ? game.players[0].y : 0);
       const pos = vent
-        ? game.map.randomFloorRingWorld(game.rng, game.player.x, game.player.y, 280, 1e9)
+        ? game.map.randomFloorRingWorld(game.rng, anchor.x, anchor.y, 280, 1e9)
         : spawnRing(game);
       const elite = t > 90 && game.rng.chance(0.04);
       spawnEnemy(game, pickType(game), pos.x, pos.y, elite);

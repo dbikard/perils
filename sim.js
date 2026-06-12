@@ -37,16 +37,19 @@ let ablated = new Set();
 globalThis.UI = {
   layoutButtons() {},
   openLevelUp(game) {
+    const p = game.players ? game.players[0] : game.player;
     while (game.pendingLevels > 0) {
-      const choices = globalThis.Upgrades.generateChoices(game, 3);
+      const choices = globalThis.Upgrades.generateChoices(game, 3, p);
       const pick = activeBot.pick(game, choices) || choices[0];
-      globalThis.Upgrades.applyChoice(game, pick);
+      globalThis.Upgrades.applyChoice(game, pick, p);
       game.pendingLevels--;
     }
+    p.pendingLevels = 0;
   },
   openCache(game, choices) {
+    const p = game.players ? game.players[0] : game.player;
     const pick = activeBot.pick(game, choices) || choices[0];
-    globalThis.Upgrades.applyChoice(game, pick);
+    globalThis.Upgrades.applyChoice(game, pick, p);
   }
 };
 
@@ -340,7 +343,7 @@ function playRun(botName, seed, opts) {
   if (opts.trace) {
     for (const s of trace) console.log(`    t=${String(s.t).padStart(3)}s hp=${String(s.hp).padStart(3)} lv=${String(s.lv).padStart(2)} enemies=${String(s.enemies).padStart(3)} kills=${String(s.kills).padStart(4)} warp=${s.warp}%`);
     console.log(`    weapons: ${game.player.weapons.map(w => `${w.id}:${w.level}`).join(' ')}  special: ${game.player.special ? game.player.special.id + ':' + game.player.special.level : '—'}`);
-    console.log(`    passives: ${Object.entries(game.upgradeLevels).map(([k, v]) => `${k}:${v}`).join(' ') || '—'}`);
+    console.log(`    passives: ${Object.entries(game.player.upgradeLevels).map(([k, v]) => `${k}:${v}`).join(' ') || '—'}`);
     console.log(`    caches looted: ${game.caches.filter(c => c.taken).length}/${game.caches.length}  crew: ${game.survivors.map(s => s.name + '=' + s.state).join(' ') || '—'}`);
   }
   return { time: game.timeSec, escaped, level: game.player.level, kills: game.kills, seed,
@@ -396,7 +399,20 @@ const opts = { trace: !!args.trace, stage };
 console.log(`Perils sim — stage ${stage} (${Run.STAGES[stage].name}), ${runs} run(s)/bot, seed base ${seed0}, warp=${Run.STAGES[stage].warpTime}s`);
 console.log(`targets: random <2:00 & ~0% escape · greedy 3:00–6:00 · skilled 25–45% escape\n`);
 
-if (args.ablate) {
+if (args.determinism) {
+  // co-op lockstep requires the sim to be a pure function of (seed, inputs):
+  // play the same seeded run twice and require bit-identical outcomes
+  let ok = true;
+  for (let i = 0; i < 5; i++) {
+    const a = playRun('skilled', seed0 + i * 31, opts);
+    const b = playRun('skilled', seed0 + i * 31, opts);
+    const same = a.time === b.time && a.kills === b.kills && a.level === b.level && a.escaped === b.escaped;
+    console.log(`  seed ${a.seed}: ${same ? 'OK ' : 'DIVERGED'}  t=${a.time.toFixed(3)}/${b.time.toFixed(3)} kills=${a.kills}/${b.kills} lv=${a.level}/${b.level}`);
+    if (!same) ok = false;
+  }
+  console.log(ok ? '\ndeterminism: PASS' : '\ndeterminism: FAIL — lockstep co-op would desync');
+  process.exit(ok ? 0 : 1);
+} else if (args.ablate) {
   // ablation: disable one mechanic at a time for the skilled bot, compare to baseline
   const features = args.ablate === true ? ['blink', 'special', 'ult', 'magnet'] : args.ablate.split(',');
   ablated = new Set();

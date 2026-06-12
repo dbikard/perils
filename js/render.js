@@ -344,7 +344,9 @@
   }
 
   function drawOrbiters(ctx, game) {
-    const ws = game.player.weapons;
+    const players = game.players || [game.player];
+    const ws = [];
+    for (const pl of players) ws.push(...pl.weapons);
     for (let i = 0; i < ws.length; i++) {
       if (ws[i].id !== 'orbiter') continue;
       const st = ws[i].state, pos = st.positions, br = st.bodyR || 12;
@@ -399,8 +401,27 @@
 
   // Player = Ace, a pixel-art space fighter drawn billboard-style (upright, flips L/R).
   // Walk-animates when moving; armour tier swaps the sprite (basic / armored / heavy).
-  function drawPlayer(ctx, game) {
-    const p = game.player, r = p.r, TAU = Engine.TAU, S = global.Sprites;
+  function drawPlayers(ctx, game) {
+    const players = game.players || [game.player];
+    for (const p of players) drawPlayer(ctx, game, p);
+  }
+  function drawPlayer(ctx, game, p) {
+    const r = p.r, TAU = Engine.TAU, S = global.Sprites;
+    if (p.dead) { // downed partner: a fading beacon where they fell
+      ctx.save(); ctx.globalAlpha = 0.5 + 0.3 * Math.sin(game.timeSec * 6);
+      ctx.strokeStyle = '#7fd8ff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke();
+      ctx.font = '10px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#7fd8ff';
+      ctx.fillText(Math.ceil(p.respawn) + 's', p.x, p.y - r - 6);
+      ctx.textAlign = 'start'; ctx.restore();
+      return;
+    }
+    // co-op: ring under the partner so the two fighters read apart
+    if (game.players && game.players.length > 1 && p !== game.localPlayer) {
+      ctx.save(); ctx.strokeStyle = 'rgba(255,209,102,0.75)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y + r * 0.95, r * 1.05, r * 0.45, 0, 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
 
     // drop shadow at the feet
     ctx.save();
@@ -486,7 +507,7 @@
   }
 
   function drawXpBar(ctx, game) {
-    const p = game.player, W = global.Engine.width;
+    const p = game.localPlayer || game.player, W = global.Engine.width;
     const frac = p.xpNext > 0 ? p.xp / p.xpNext : 0;
     ctx.fillStyle = 'rgba(56,232,255,0.15)'; ctx.fillRect(0, 0, W, 4);
     ctx.fillStyle = '#38e8ff'; ctx.fillRect(0, 0, W * Engine.clamp(frac, 0, 1), 4);
@@ -528,7 +549,7 @@
   }
 
   function drawHUDOverlay(ctx, game) {
-    const p = game.player, W = global.Engine.width;
+    const p = game.localPlayer || game.player, W = global.Engine.width;
     // HP bar (screen space)
     const bw = Math.min(280, W - 40), bx = (W - bw) / 2, by = 44, bh = 10;
     ctx.fillStyle = 'rgba(255,90,110,0.18)';
@@ -577,7 +598,7 @@
 
   function drawEscapeArrow(ctx, game) {
     if (game.phase !== 'ESCAPE') return;
-    const ex = game.map.exit, p = game.player;
+    const ex = game.map.exit, p = game.localPlayer || game.player;
     const s = global.Engine.worldToScreen(ex.x, ex.y);
     const W = global.Engine.width, H = global.Engine.height, m = 44;
     if (s.x > m && s.x < W - m && s.y > m && s.y < H - m) return; // on screen
@@ -614,7 +635,7 @@
     drawEnemies(ctx, game);
     drawOrbiters(ctx, game);
     drawEffectsWorld(ctx, game);
-    drawPlayer(ctx, game);
+    drawPlayers(ctx, game);
     if (global.Particles) global.Particles.draw(ctx, game);
     ctx.restore();
 
