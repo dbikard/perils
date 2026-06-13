@@ -705,7 +705,27 @@
     E.initCanvas(document.getElementById('game'));
     global.Sprites.load();
     const v = document.querySelector('#menu .version');
-    if (v) v.textContent = 'v' + (global.GAME_VERSION || '0.0.0');
+    if (v) {
+      v.textContent = 'v' + (global.GAME_VERSION || '0.0.0') + ' ';
+      // force a fresh fetch of index.html (and thus the newest ?v= assets),
+      // bypassing any cached HTML so players can self-update without a hard reload
+      const r = document.createElement('button');
+      r.id = 'refresh-btn'; r.type = 'button';
+      r.textContent = '⟳ update';
+      r.title = 'Reload the latest version';
+      r.addEventListener('click', async () => {
+        r.textContent = 'updating…';
+        try {
+          if (global.caches) { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); }
+          if (global.navigator && navigator.serviceWorker) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((reg) => reg.unregister()));
+          }
+        } catch (e) { /* best-effort cache clear */ }
+        location.replace(location.pathname + '?fresh=' + Date.now()); // cache-busted reload
+      });
+      v.appendChild(r);
+    }
     document.getElementById('start-btn').addEventListener('click', () => {
       const Net = global.Net;
       if (Net && Net.active) {

@@ -145,6 +145,12 @@ html, body {
   color: #34466a;
   font-size: 11px;
 }
+#refresh-btn {
+  background: none; border: 1px solid rgba(86, 120, 170, 0.4); cursor: pointer;
+  color: #5e77a0; font-size: 11px; letter-spacing: 1px;
+  border-radius: 6px; padding: 2px 8px; margin-left: 4px;
+}
+#refresh-btn:active { color: var(--neon-cyan); border-color: var(--neon-cyan); }
 
 /* ---- Level-up modal ---- */
 #levelup {
