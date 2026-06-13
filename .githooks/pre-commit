@@ -1,9 +1,10 @@
 #!/bin/sh
 # Auto-bump the patch version in index.html on every commit.
 #
-# Keeps GAME_VERSION and every ?v=X.Y.Z asset query string in sync so the
-# browser cache-busts all assets whenever code changes — players who reload
-# always get the newest build. Portable POSIX sh (works on macOS and Linux).
+# Keeps GAME_VERSION and every ?v=X.Y.Z asset query string in sync (in both
+# index.html and manifest.json) so the browser cache-busts all assets — including
+# the installed-app icons — whenever code changes; players who reload always get
+# the newest build. Portable POSIX sh (works on macOS and Linux).
 #
 # Enable once per clone with:
 #     git config core.hooksPath .githooks
@@ -22,9 +23,13 @@ minor=${rest%%.*}
 patch=${rest##*.}
 next="$major.$minor.$((patch + 1))"
 
-# replace every occurrence of the exact current version (dots escaped)
+# replace every occurrence of the exact current version (dots escaped) across
+# index.html and manifest.json (the icon ?v= strings live there)
 cur_re=$(printf '%s' "$cur" | sed 's/\./\\./g')
-tmp=$(mktemp)
-sed "s/$cur_re/$next/g" "$INDEX" > "$tmp" && mv "$tmp" "$INDEX"
-git add "$INDEX"
+for f in "$INDEX" manifest.json; do
+  [ -f "$f" ] || continue
+  tmp=$(mktemp)
+  sed "s/$cur_re/$next/g" "$f" > "$tmp" && mv "$tmp" "$f"
+  git add "$f"
+done
 echo "pre-commit: bumped version $cur -> $next"
