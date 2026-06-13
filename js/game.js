@@ -768,6 +768,15 @@
       if (txt && navigator.clipboard) { navigator.clipboard.writeText(txt); diagCopy.textContent = 'copied ✔'; setTimeout(() => { diagCopy.textContent = 'copy diagnostics'; }, 1500); }
     });
 
+    const qr = $('coop-qr');
+    // join URL = this page with a #room=CODE marker; partner scans → auto-joins
+    const joinURL = (code) => location.href.split('#')[0] + '#room=' + code;
+    const showQR = (code) => {
+      if (!qr || !global.QR) return;
+      try { global.QR.render(qr, joinURL(code), { size: 232, dark: '#05070d', light: '#e8f1ff' }); qr.classList.remove('hidden'); }
+      catch (e) { qr.classList.add('hidden'); }
+    };
+
     $('coop-toggle').addEventListener('click', () => panel.classList.toggle('hidden'));
 
     // room-code flow
@@ -777,7 +786,8 @@
       try {
         const code = await Net.hostRoom(say);
         room.textContent = code;
-        say('waiting for partner — they enter this code and tap JOIN');
+        showQR(code);
+        say('partner scans this QR with their camera (or types ' + code + ')');
       } catch (e) {
         say('room service unreachable — use offline pairing below');
       }
@@ -818,6 +828,7 @@
     });
 
     Net.onOpen = () => {
+      if (qr) qr.classList.add('hidden'); // paired — no need for the code anymore
       say(Net.isHost ? 'CONNECTED — press LAUNCH to start the run' : 'CONNECTED — waiting for the host to launch');
       const sb = document.getElementById('start-btn');
       if (!Net.isHost) sb.textContent = 'WAITING FOR HOST…';
@@ -827,6 +838,19 @@
       if (game.phase === 'PLAYING' || game.phase === 'ESCAPE') game.announce('PARTNER LINK LOST — going it alone', 4);
       else say('disconnected');
     };
+
+    // scanned-a-QR / opened-a-join-link flow: #room=CODE → auto-join, no typing
+    const hashMatch = /[#&]room=([A-Za-z0-9]{4,8})/.exec(location.hash || '');
+    if (hashMatch) {
+      const code = hashMatch[1].toUpperCase();
+      panel.classList.remove('hidden');
+      if ($('coop-code')) $('coop-code').value = code;
+      // strip the marker so a reload doesn't re-trigger
+      try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
+      if (Net.diagReset) Net.diagReset();
+      say('joining ' + code + '…');
+      Net.joinRoom(code).catch((e) => say(e.message));
+    }
   }
 
   if (hasDOM) {
