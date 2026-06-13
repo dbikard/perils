@@ -86,6 +86,53 @@ def draw_ace(armor=2, frame=0):
     return b
 
 
+# ---- second fighter: Nova — violet armor, magenta trim, green visor, fin crest ----
+NOVA = {
+    'P': (34, 20, 54), 'Z': (88, 52, 128), 'z': (140, 96, 192), 'X': (196, 158, 236),
+    'm': (236, 84, 164), 'I': (255, 150, 210), 'j': (110, 250, 168), 'J': (200, 255, 222),
+}
+
+
+def draw_nova(armor=2, frame=0):
+    b = blank()
+    heavy, plated, pauldron = armor >= 5, armor >= 2, armor >= 3
+    bdx, fdx = LEGS.get(frame, (-1, 1))
+    leg(b, 11 + bdx, 'P')   # back leg (dark violet)
+    leg(b, 11 + fdx, 'Z')   # front leg (mid violet)
+    if heavy:
+        rect(b, 11 + fdx, 27, 11 + fdx + 2, 28, 'z')   # knee guard
+
+    # torso
+    rect(b, 8, 13, 15, 22, 'Z'); rect(b, 9, 14, 14, 21, 'z')
+    if plated:
+        rect(b, 9, 14, 14, 19, 'X'); rect(b, 10, 15, 13, 18, 'z')
+    else:
+        rect(b, 10, 15, 13, 18, 'P')
+    rect(b, 8, 21, 15, 22, 'P'); px(b, 11, 21, 'm'); px(b, 12, 21, 'm')  # belt + magenta buckle
+    px(b, 9, 15, 'm')                             # chest light
+    rect(b, 7, 14, 9, 19, 'P')                    # back arm
+
+    # rifle + front arm
+    rect(b, 13, 16, 17, 18, 'P'); rect(b, 16, 15, 25, 17, 'g')
+    rect(b, 14, 17, 19, 19, 'G'); rect(b, 13, 18, 15, 20, 'g'); px(b, 25, 16, 'I')
+    if pauldron:
+        rect(b, 12, 12, 16, 14, 'X'); rect(b, 13, 12, 15, 13, 'm')   # magenta pauldron trim
+    if heavy:
+        rect(b, 6, 13, 8, 16, 'X')
+
+    # neck + helmet (swept fin crest + green visor, vs Ace's antenna + cyan)
+    rect(b, 10, 11, 13, 12, 'P')
+    rect(b, 7, 3, 15, 10, 'Z'); rect(b, 8, 3, 14, 9, 'z')
+    px(b, 7, 3, None); px(b, 15, 3, None); px(b, 7, 10, None)
+    rect(b, 9, 1, 13, 2, 'm'); px(b, 8, 2, 'm'); px(b, 14, 1, 'I'); px(b, 13, 0, 'I')  # swept fin crest
+    rect(b, 6, 6, 7, 8, 'P')
+    rect(b, 12, 5, 15, 9, 'j'); px(b, 14, 6, 'J'); px(b, 15, 7, 'J')   # green visor
+    if armor >= 1:
+        px(b, 13, 5, 'J'); px(b, 14, 8, 'J')
+    px(b, 13, 10, 'k'); px(b, 14, 10, 'k')
+    return b
+
+
 # ---- front-facing portrait bust ----
 PW, PH = 38, 38
 
@@ -176,6 +223,19 @@ for tname, alvl in TIERS.items():
 
 to_image(outline(draw_portrait()), scale=1).save(os.path.join(OUT_DIR, 'ace_portrait.png'))
 print('wrote sprites + portrait to', OUT_DIR)
+
+# Nova (player 2) — uses its own palette; added before the enemy palette so the
+# keys are still free
+C.update(NOVA)
+for tname, alvl in TIERS.items():
+    for f in FRAMES:
+        to_image(outline(draw_nova(alvl, f))).save(os.path.join(OUT_DIR, f'nova_{tname}_{f}.png'))
+print('wrote nova sprites')
+nsheet = Image.new('RGBA', (W * 6 * 5 + 30, H * 6 + 20), (11, 20, 34, 255))
+for f in FRAMES:
+    img = to_image(outline(draw_nova(2, f)), scale=6)
+    nsheet.paste(img, (10 + f * (W * 6 + 4), 10), img)
+nsheet.save('/tmp/nova_walk.png')
 
 # previews
 sheet = Image.new('RGBA', (W * 6 * 5 + 30, H * 6 + 20), (11, 20, 34, 255))
