@@ -99,11 +99,18 @@ A headless bot plays the run (herds the horde, greeds toward XP, blinks out of s
 
 ### Bot Skill Targets
 
-| Bot | Target | Meaning |
+**The skilled bot's escape rate is the single difficulty target.** Tune every config —
+solo and co-op — to land it in the band below. The random and greedy bots are reported
+for context (sanity checks, ablation signal) but are **not** targets: do not sacrifice the
+skilled band to make greedy survive longer or random die slower. This matters most in
+co-op, where optimal coordinated play and casual play diverge far more than in solo — you
+cannot satisfy all three at once, so only skilled gates the tuning.
+
+| Bot | Role | Meaning |
 |---|---|---|
-| Random (moves randomly, random picks) | dies < 2 min, ~0% escape | Game has real difficulty |
-| Greedy (chase XP, ignore danger) | dies 3–6 min | Naive play isn't enough |
-| Skilled (kite, use choke points, Blink, smart picks) | survives to escape 25–45% | Skill is rewarded, not trivial |
+| Skilled (kite, use choke points, Blink, smart picks) | **escape 25–45% ← the target** | Skill is rewarded, not trivial |
+| Greedy (chase XP, ignore danger) | context only | naive-play signal |
+| Random (moves randomly, random picks) | context only | floor / ablation signal |
 
 ### Per-System Targets
 

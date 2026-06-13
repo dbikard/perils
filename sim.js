@@ -3,12 +3,15 @@
  *
  * Loads the REAL game modules (no browser) and steps the actual game.js update
  * loop at the fixed timestep, with a bot driving the input. Measures survival
- * time, escape rate and progression so difficulty can be tuned against the
- * targets in DESIGN_PRINCIPLES.md:
+ * time, escape rate and progression.
  *
- *   random  — moves randomly, random picks   → dies < 2 min, ~0% escape
- *   greedy  — chases XP, ignores danger      → dies 3–6 min
- *   skilled — kites, greeds safely, abilities → escapes 25–45%
+ * Difficulty is tuned against ONE target: the skilled bot's escape rate
+ * (see DESIGN_PRINCIPLES.md). random and greedy are reported for context only —
+ * they are not tuning targets and their numbers do not gate a config.
+ *
+ *   random  — moves randomly, random picks   → context only
+ *   greedy  — chases XP, ignores danger       → context only
+ *   skilled — kites, greeds safely, abilities → escapes 25–45%  ← the target
  *
  * Usage:
  *   node sim.js                         # all three bots, 20 runs each
@@ -466,7 +469,7 @@ const players = parseInt(args.players || '1', 10);
 const opts = { trace: !!args.trace, stage, players };
 
 console.log(`Perils sim — stage ${stage} (${Run.STAGES[stage].name}), ${players}P, ${runs} run(s)/bot, seed base ${seed0}, warp=${Run.STAGES[stage].warpTime}s`);
-console.log(`targets: random <2:00 & ~0% escape · greedy 3:00–6:00 · skilled 25–45% escape\n`);
+console.log(`tuning target: skilled escape 25–45%  (random/greedy shown for context only)\n`);
 
 if (args.determinism) {
   // co-op lockstep requires the sim to be a pure function of (seed, inputs):
