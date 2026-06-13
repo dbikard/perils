@@ -602,13 +602,37 @@
     ctx.textAlign = 'start';
   }
 
+  // greedily break text into lines that fit within maxW (canvas has no wrapping)
+  function wrapText(ctx, text, maxW) {
+    const words = String(text).split(' ');
+    const lines = [];
+    let line = '';
+    for (let i = 0; i < words.length; i++) {
+      const test = line ? line + ' ' + words[i] : words[i];
+      if (ctx.measureText(test).width > maxW && line) {
+        lines.push(line); line = words[i];
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
   function drawBanner(ctx, game) {
     const b = game.banner;
     if (!b || b.life <= 0) return;
+    const W = global.Engine.width, H = global.Engine.height;
     ctx.save();
     ctx.globalAlpha = Math.min(1, b.life);
-    ctx.fillStyle = b.color || '#ff5a6e'; ctx.font = 'bold 18px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText(b.text, global.Engine.width / 2, global.Engine.height * 0.26);
+    ctx.fillStyle = b.color || '#ff5a6e'; ctx.textAlign = 'center';
+    // shrink the font on narrow screens so wrapped story text stays readable
+    const fontPx = W < 420 ? 15 : 18;
+    ctx.font = `bold ${fontPx}px system-ui`;
+    const lines = wrapText(ctx, b.text, W * 0.9);
+    const lineH = fontPx * 1.3;
+    let y = H * 0.26 - (lines.length - 1) * lineH / 2;
+    for (let i = 0; i < lines.length; i++) { ctx.fillText(lines[i], W / 2, y); y += lineH; }
     ctx.restore(); ctx.textAlign = 'start';
   }
 
