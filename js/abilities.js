@@ -107,7 +107,7 @@
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
       if ((e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y) <= R2) {
-        e.hp -= p.ult.damage; if (e.hp <= 0) game.killEnemy(e);
+        e.hp -= p.ult.damage; if (e.hp <= 0) game.killEnemy(e, p);
       }
     }
     game.addEffect({ type: 'ring', x: p.x, y: p.y, r0: 12, r1: R, life: 0.5, maxLife: 0.5, color: '#ffd166' });
@@ -145,7 +145,7 @@
           const pr = game.projectiles.spawn();
           pr.x = s.x; pr.y = s.y; pr.vx = dx / l * 430; pr.vy = dy / l * 430;
           pr.r = 4; pr.damage = s.damage * (s.owner ? s.owner.stats.damageMult : 1);
-          pr.life = 1.0; pr.pierce = 0; pr.color = '#54ff9f';
+          pr.life = 1.0; pr.pierce = 0; pr.color = '#54ff9f'; pr.owner = s.owner || null;
         }
       }
     }

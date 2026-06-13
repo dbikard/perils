@@ -36,9 +36,10 @@
     return false;
   };
 
-  game.killEnemy = function (e) {
+  game.killEnemy = function (e, killer) {
     if (!e._active) return;
     game.kills++;
+    if (killer) killer.kills = (killer.kills || 0) + 1; // per-player credit for the end screen
     global.Abilities.addUltCharge(game, game.player.ult.perKill);
     if (global.Particles) global.Particles.burst(game, e.x, e.y, e.color || '#ff5a6e', e.boss ? 26 : 6, e.boss ? 230 : 150);
     if (global.SFX) global.SFX.kill();
@@ -164,6 +165,7 @@
   }
 
   function startGame(opts) {
+    if (hasDOM) { const rs = document.getElementById('run-summary'); if (rs) { rs.innerHTML = ''; rs.classList.add('hidden'); } }
     const seed = (opts && typeof opts.seed === 'number') ? opts.seed : Math.floor(Math.random() * 1e9);
     E.seed(seed);
     game.seed = seed;
@@ -191,6 +193,7 @@
     for (let i = 0; i < numPlayers; i++) {
       const pl = global.Entities.createPlayer(i);
       pl.x = game.map.spawn.x + i * 26; pl.y = game.map.spawn.y;
+      pl.kills = 0; pl.downs = 0; pl.revives = 0; // per-player run stats (end screen)
       game.players.push(pl);
       global.Weapons.acquire(game, 'pulse', pl); // starting weapon
     }
@@ -235,6 +238,25 @@
     }
   }
 
+  // per-player scoreboard on the end screen (kills / level / downs+rescues in co-op)
+  function renderRunSummary() {
+    if (!hasDOM) return;
+    const el = document.getElementById('run-summary');
+    if (!el) return;
+    const coop = game.players.length > 1;
+    el.innerHTML = game.players.map((pl) => {
+      const name = pl.idx === 0 ? 'ACE' : 'NOVA';
+      const cells = [`LV ${pl.level}`, `${pl.kills || 0} kills`];
+      if (coop) {
+        cells.push(`${pl.downs || 0} down${(pl.downs || 0) === 1 ? '' : 's'}`);
+        cells.push(`${pl.revives || 0} rescue${(pl.revives || 0) === 1 ? '' : 's'}`);
+        cells.push(pl.dead ? '✖ down' : '✓ alive');
+      }
+      return `<div class="rs-row${pl.idx === 1 ? ' nova' : ''}"><b>${name}</b>${cells.map(c => `<span>${c}</span>`).join('')}</div>`;
+    }).join('');
+    el.classList.remove('hidden');
+  }
+
   function gameOver() {
     game.phase = 'GAME_OVER';
     if (global.SFX) global.SFX.over();
@@ -248,6 +270,7 @@
       `${game.stageDef.name}: you survived ${formatTime(game.timeSec)} and downed ${game.kills} hostiles.`
       + ((rec && rec.newBestTime) ? ' Personal best!' : '');
     document.getElementById('start-btn').textContent = 'RELAUNCH';
+    renderRunSummary();
     if (global.Meta) global.Meta.renderMenuStats();
     menu.classList.remove('hidden');
   }
@@ -270,6 +293,7 @@
     } else {
       document.getElementById('start-btn').textContent = 'RUN AGAIN';
     }
+    renderRunSummary();
     if (global.Meta) global.Meta.renderMenuStats();
     menu.classList.remove('hidden');
   }
@@ -411,6 +435,7 @@
           if (pl.respawn <= 0 && mate && !mate.dead) {
             pl.dead = false; pl.hp = pl.maxHp * 0.5; pl.invuln = 2;
             pl.x = mate.x; pl.y = mate.y;
+            mate.revives = (mate.revives || 0) + 1;
             game.announce(`${pl.idx === 0 ? 'ACE' : 'NOVA'} BACK IN THE FIGHT`, 2.5, '#7fd8ff');
           }
         }
@@ -521,7 +546,7 @@
     let anyAlive = false;
     for (const pl of game.players) {
       if (!pl.dead && pl.hp <= 0) {
-        pl.hp = 0; pl.dead = true;
+        pl.hp = 0; pl.dead = true; pl.downs = (pl.downs || 0) + 1;
         if (game.players.length > 1) {
           pl.respawn = 15;
           game.announce(`${pl.idx === 0 ? 'ACE' : 'NOVA'} IS DOWN — recovery in 15s`, 3);

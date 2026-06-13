@@ -14,10 +14,11 @@
     };
   }
 
-  function spawnProjectile(game, x, y, dx, dy, speed, r, damage, life, pierce, color) {
+  function spawnProjectile(game, x, y, dx, dy, speed, r, damage, life, pierce, color, owner) {
     const pr = game.projectiles.spawn();
     pr.x = x; pr.y = y; pr.vx = dx * speed; pr.vy = dy * speed;
     pr.r = r; pr.damage = damage; pr.life = life; pr.pierce = pierce; pr.color = color;
+    pr.owner = owner || null; // credit kills to the firing player (end-screen stats)
     return pr;
   }
 
@@ -81,7 +82,7 @@
           const t = targets[k % targets.length];
           let dx = t.x - p.x, dy = t.y - p.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
           if (k >= targets.length) { const a = ((k - targets.length + 1) * 0.18) * (k % 2 ? 1 : -1), c = Math.cos(a), si = Math.sin(a); const rx = dx * c - dy * si, ry = dx * si + dy * c; dx = rx; dy = ry; }
-          spawnProjectile(game, p.x, p.y, dx, dy, s.speed, s.projR, dmg, s.life, s.pierce, this.color);
+          spawnProjectile(game, p.x, p.y, dx, dy, s.speed, s.projR, dmg, s.life, s.pierce, this.color, p);
         }
         const m0 = targets[0], mdx = m0.x - p.x, mdy = m0.y - p.y, ml = Math.hypot(mdx, mdy) || 1;
         game.addEffect({ type: 'muzzle', x: p.x + mdx / ml * p.r * 1.2, y: p.y + mdy / ml * p.r * 1.2, angle: Math.atan2(mdy, mdx), life: 0.07, maxLife: 0.07, color: this.color });
@@ -102,7 +103,7 @@
         for (let i = 0; i < pellets; i++) {
           const t = pellets === 1 ? 0.5 : i / (pellets - 1);
           const a = base + (t - 0.5) * s.spread;
-          spawnProjectile(game, p.x, p.y, Math.cos(a), Math.sin(a), s.speed, s.projR, dmg, s.life, 0, this.color);
+          spawnProjectile(game, p.x, p.y, Math.cos(a), Math.sin(a), s.speed, s.projR, dmg, s.life, 0, this.color, p);
         }
         game.addEffect({ type: 'muzzle', x: p.x + dir.x * p.r * 1.2, y: p.y + dir.y * p.r * 1.2, angle: base, life: 0.07, maxLife: 0.07, color: this.color });
         if (global.SFX) global.SFX.shoot();
@@ -126,7 +127,7 @@
           cur.hp -= dmg; cur.hitFlash = 0.08; seen.add(cur);
           if (global.Particles) global.Particles.spark(game, cur.x, cur.y, this.color);
           fromX = cur.x; fromY = cur.y;
-          if (cur.hp <= 0) game.killEnemy(cur);
+          if (cur.hp <= 0) game.killEnemy(cur, p);
           dmg *= 0.85; hops--;
           cur = nearestExcluding(game, fromX, fromY, s.jump, seen, true);
         }
@@ -154,7 +155,7 @@
           const proj = rx * dir.x + ry * dir.y;            // distance along beam
           if (proj < 0 || proj > s.range) continue;
           const perp = Math.abs(rx * dir.y - ry * dir.x);  // perpendicular distance
-          if (perp <= half + en.r) { en.hp -= dmg; en.hitFlash = 0.08; if (global.Particles) global.Particles.spark(game, en.x, en.y, this.color); if (en.hp <= 0) game.killEnemy(en); }
+          if (perp <= half + en.r) { en.hp -= dmg; en.hitFlash = 0.08; if (global.Particles) global.Particles.spark(game, en.x, en.y, this.color); if (en.hp <= 0) game.killEnemy(en, p); }
         }
       }
     },
@@ -178,7 +179,7 @@
             if (!en._active) return;
             const rr = s.bodyR + en.r;
             if ((en.x - ox) * (en.x - ox) + (en.y - oy) * (en.y - oy) <= rr * rr) {
-              en.hp -= dps; en.hitFlash = 0.06; if (en.hp <= 0) game.killEnemy(en);
+              en.hp -= dps; en.hitFlash = 0.06; if (en.hp <= 0) game.killEnemy(en, p);
             }
           });
         }
@@ -196,7 +197,7 @@
         w.timer -= dt; if (w.timer > 0) return; w.timer += s.cooldown * e.cd;
         const m = game.mines.spawn();
         m.x = p.x; m.y = p.y; m.r = 7; m.arm = 0.4; m.damage = s.damage * e.dmg;
-        m.radius = s.radius; m.triggerR = s.triggerR; m.life = s.life;
+        m.radius = s.radius; m.triggerR = s.triggerR; m.life = s.life; m.owner = p;
       }
     }
   };
@@ -230,7 +231,7 @@
         if ((en.x - pr.x) * (en.x - pr.x) + (en.y - pr.y) * (en.y - pr.y) <= rr * rr) {
           en.hp -= pr.damage; en.hitFlash = 0.08;
           if (global.Particles) global.Particles.spark(game, pr.x, pr.y, pr.color);
-          if (en.hp <= 0) game.killEnemy(en);
+          if (en.hp <= 0) game.killEnemy(en, pr.owner);
           if (pr.pierce > 0) pr.pierce--; else dead = true;
         }
       });
@@ -262,7 +263,7 @@
       for (let j = list.length - 1; j >= 0; j--) {
         const en = list[j];
         if ((en.x - m.x) * (en.x - m.x) + (en.y - m.y) * (en.y - m.y) <= rad2) {
-          en.hp -= m.damage; en.hitFlash = 0.1; if (en.hp <= 0) game.killEnemy(en);
+          en.hp -= m.damage; en.hitFlash = 0.1; if (en.hp <= 0) game.killEnemy(en, m.owner);
         }
       }
       game.mines.release(m);
