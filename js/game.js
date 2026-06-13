@@ -829,7 +829,9 @@
     const qrDisplay = $('qr-display'), qrScanReply = $('qr-scan-reply');
     const showPairQR = (code) => {
       if (!qrDisplay || !global.QR) return false;
-      try { global.QR.render(qrDisplay, code, { size: 300, dark: '#05070d', light: '#e8f1ff' }); qrDisplay.classList.remove('hidden'); return true; }
+      // high internal resolution (crisp when CSS-scaled) + wide quiet zone +
+      // pure black/white for the best chance the camera locks and decodes
+      try { global.QR.render(qrDisplay, code, { size: 720, quiet: 4, dark: '#000000', light: '#ffffff' }); qrDisplay.classList.remove('hidden'); return true; }
       catch (e) { qrDisplay.classList.add('hidden'); return false; }
     };
     const hidePairUI = () => { if (qrDisplay) qrDisplay.classList.add('hidden'); if (qrScanReply) qrScanReply.classList.add('hidden'); };
@@ -847,18 +849,39 @@
         try { detector = new window.BarcodeDetector({ formats: ['qr_code'] }); }
         catch (e) { reject(new Error('QR scanning unavailable — use offline copy-paste')); return; }
         let stream;
-        try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); }
-        catch (e) { reject(new Error('camera blocked — allow camera access, or use copy-paste')); return; }
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+          });
+        } catch (e) { reject(new Error('camera blocked — allow camera access, or use copy-paste')); return; }
+        // best-effort continuous autofocus (default constraints often lock focus
+        // at infinity and never lock onto a nearby phone screen)
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = track.getCapabilities ? track.getCapabilities() : {};
+          const adv = [];
+          if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0) adv.push({ focusMode: 'continuous' });
+          if (caps.focusDistance && caps.focusMode && caps.focusMode.indexOf('manual') >= 0 && !adv.length) adv.push({ focusMode: 'manual', focusDistance: caps.focusDistance.min });
+          if (adv.length) await track.applyConstraints({ advanced: adv });
+        } catch (e) { /* focus control unsupported — rely on device default */ }
         video.srcObject = stream; try { await video.play(); } catch (e) {}
         if (overlay) overlay.classList.remove('hidden');
         let done = false;
+        const snap = document.createElement('canvas');
+        const sctx = snap.getContext('2d');
         const cleanup = () => { done = true; if (overlay) overlay.classList.add('hidden'); stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; };
         if (cancel) cancel.onclick = () => { cleanup(); reject(new Error('scan cancelled')); };
         const tick = async () => {
           if (done) return;
-          try { const codes = await detector.detect(video); if (codes && codes.length && codes[0].rawValue) { const v = codes[0].rawValue; cleanup(); resolve(v); return; } }
-          catch (e) { /* transient detect error — keep scanning */ }
-          requestAnimationFrame(tick);
+          try {
+            // detect off a snapshot canvas — more reliable than a <video> on
+            // some Android devices — and check both orientations
+            let src = video;
+            if (video.videoWidth) { snap.width = video.videoWidth; snap.height = video.videoHeight; sctx.drawImage(video, 0, 0); src = snap; }
+            const codes = await detector.detect(src);
+            if (codes && codes.length && codes[0].rawValue) { const v = codes[0].rawValue; cleanup(); resolve(v); return; }
+          } catch (e) { /* transient detect error — keep scanning */ }
+          if (!done) setTimeout(() => requestAnimationFrame(tick), 80); // ~12fps: gentler, lets autofocus settle
         };
         requestAnimationFrame(tick);
       });
