@@ -35,10 +35,9 @@ html, body {
 
 .hidden { display: none !important; }
 
-#mute {
+#mute, #fullscreen {
   position: fixed;
   top: max(8px, env(safe-area-inset-top));
-  right: max(8px, env(safe-area-inset-right));
   z-index: 40;
   width: 36px;
   height: 36px;
@@ -50,7 +49,9 @@ html, body {
   color: #fff;
   cursor: pointer;
 }
-#mute:active { transform: scale(0.94); }
+#mute { right: max(8px, env(safe-area-inset-right)); }
+#fullscreen { right: calc(max(8px, env(safe-area-inset-right)) + 44px); }
+#mute:active, #fullscreen:active { transform: scale(0.94); }
 
 /* ---- HUD ---- */
 #hud {
@@ -89,7 +90,11 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* `safe center` keeps content reachable from the scroll start when it's
+     taller than the viewport (e.g. co-op panel + diagnostics open) */
+  justify-content: safe center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   gap: 18px;
   background: radial-gradient(circle at 50% 40%, #0a1326 0%, #05070d 70%);
   text-align: center;
@@ -140,8 +145,7 @@ html, body {
   font-size: 12px;
 }
 #menu .version {
-  position: absolute;
-  bottom: 14px;
+  margin-top: 4px;
   color: #34466a;
   font-size: 11px;
 }

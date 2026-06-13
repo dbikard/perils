@@ -761,6 +761,28 @@
     const sync = (m) => { if (mute) mute.textContent = m ? '🔇' : '🔊'; };
     if (mute) mute.addEventListener('click', (ev) => { ev.stopPropagation(); sync(global.SFX ? global.SFX.toggle() : true); });
     global.addEventListener('keydown', (e) => { if (e.key && e.key.toLowerCase() === 'm' && global.SFX) sync(global.SFX.toggle()); });
+
+    // fullscreen toggle (button + F key). Fullscreen API works on Chrome/Android;
+    // iOS Safari doesn't support it, so hide the button there.
+    const fsBtn = document.getElementById('fullscreen');
+    const docEl = document.documentElement;
+    const canFS = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+    const toggleFS = async () => {
+      try {
+        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+        if (fsEl) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); }
+        else { await (docEl.requestFullscreen || docEl.webkitRequestFullscreen).call(docEl); }
+      } catch (e) { /* user gesture / permission issues — ignore */ }
+    };
+    if (fsBtn && canFS) {
+      fsBtn.addEventListener('click', (ev) => { ev.stopPropagation(); toggleFS(); });
+      const syncFS = () => { fsBtn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? '🗗' : '⛶'; };
+      document.addEventListener('fullscreenchange', syncFS);
+      document.addEventListener('webkitfullscreenchange', syncFS);
+    } else if (fsBtn) {
+      fsBtn.style.display = 'none';
+    }
+    global.addEventListener('keydown', (e) => { if (e.key && e.key.toLowerCase() === 'f' && canFS) toggleFS(); });
   }
 
   /* co-op lobby. Primary flow: host opens a room, partner types its 4-letter
