@@ -79,45 +79,6 @@
     return new TextDecoder().decode(buf);
   }
 
-  /* ---------------- room codes (free public signaling relay) ----------------
-   * Speaks the PeerJS cloud server's WebSocket protocol directly (no library):
-   * the relay only ferries the ~1KB SDP handshake, then gameplay traffic runs
-   * peer-to-peer over the LAN. Net.host/join (manual link codes) remain as the
-   * no-internet fallback. */
-  const SIGNAL_URL = 'wss://0.peerjs.com/peerjs';
-  const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L
-
-  function makeCode(n) {
-    let s = '';
-    for (let i = 0; i < n; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
-    return s;
-  }
-
-  function signalOpen(id) {
-    return new Promise((resolve, reject) => {
-      const token = Math.random().toString(36).slice(2, 10);
-      diag('signaling: connecting as ' + id);
-      const ws = new WebSocket(`${SIGNAL_URL}?key=peerjs&id=${id}&token=${token}`);
-      const timer = setTimeout(() => { diag('signaling: TIMEOUT (no OPEN in 8s)'); try { ws.close(); } catch (e) {} reject(new Error('signaling timeout')); }, 8000);
-      ws.onmessage = (e) => {
-        let m; try { m = JSON.parse(e.data); } catch (err) { return; }
-        if (m.type === 'OPEN') { diag('signaling: OPEN'); clearTimeout(timer); resolve(ws); }
-        else if (m.type === 'ID-TAKEN' || m.type === 'ERROR') { diag('signaling: ' + m.type); clearTimeout(timer); ws.close(); reject(new Error(m.type)); }
-      };
-      ws.onerror = () => { diag('signaling: socket ERROR (unreachable/blocked)'); clearTimeout(timer); reject(new Error('signaling unreachable')); };
-    });
-  }
-  function startHeartbeat(ws) {
-    const hb = setInterval(() => {
-      if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'HEARTBEAT' }));
-      else clearInterval(hb);
-    }, 5000);
-    ws.addEventListener('close', () => clearInterval(hb));
-  }
-  function closeSignaling() {
-    if (Net._ws) { try { Net._ws.close(); } catch (e) {} Net._ws = null; }
-  }
-
   /* Keep the screen awake while pairing. On mobile, if the host's screen
    * sleeps (or Chrome backgrounds) while the guest is scanning, the host's JS
    * suspends and never answers the offer — the #1 cause of "no reply". */
@@ -137,96 +98,6 @@
       if (document.visibilityState === 'visible' && Net._pairing) acquireWake();
     });
   }
-
-  // host: opens a room and returns its 4-letter code; resolves the moment the
-  // room exists (the guest connects later, whenever they enter the code)
-  Net.hostRoom = async function (onStatus) {
-    Net.isHost = true; Net.localIdx = 0;
-    let code = null, ws = null;
-    for (let attempt = 0; attempt < 3 && !ws; attempt++) {
-      code = makeCode(4);
-      try { ws = await signalOpen('perils-' + code + '-h'); }
-      catch (e) { if (e.message !== 'ID-TAKEN' || attempt === 2) throw e; }
-    }
-    startHeartbeat(ws);
-    Net._ws = ws;
-    Net._pairing = true; acquireWake();
-    const pc = Net.pc = makePC();
-    pc.ondatachannel = (e) => wireChannel(e.channel); // the guest offers + owns the channel
-    let answering = false;
-    ws.onmessage = async (m0) => {
-      let m; try { m = JSON.parse(m0.data); } catch (e) { return; }
-      if (m.type !== 'OFFER' || !m.payload || !m.payload.sdp) return;
-      // the guest re-sends its offer until it hears back; once we've answered,
-      // just re-send the cached answer rather than redo the handshake
-      if (answering) {
-        if (pc.localDescription) { diag('host: re-sending ANSWER'); ws.send(JSON.stringify({ type: 'ANSWER', dst: m.src, payload: { sdp: pc.localDescription } })); }
-        return;
-      }
-      answering = true;
-      try {
-        diag('host: received guest OFFER');
-        if (onStatus) onStatus('partner found — linking…');
-        await pc.setRemoteDescription(m.payload.sdp);
-        await pc.setLocalDescription(await pc.createAnswer());
-        await gathered(pc);
-        ws.send(JSON.stringify({ type: 'ANSWER', dst: m.src, payload: { sdp: pc.localDescription } }));
-        diag('host: sent ANSWER');
-      } catch (err) {
-        answering = false;
-        diag('host: ANSWER failed — ' + ((err && err.message) || err));
-      }
-    };
-    return code;
-  };
-
-  // guest: joins a host's room by code; resolves when the handshake completes
-  Net.joinRoom = async function (code) {
-    Net.isHost = false; Net.localIdx = 1;
-    code = (code || '').trim().toUpperCase();
-    if (code.length < 4) throw new Error('enter the 4-letter room code');
-    const ws = await signalOpen('perils-' + code + '-g' + Math.random().toString(36).slice(2, 6));
-    startHeartbeat(ws);
-    Net._ws = ws;
-    Net._pairing = true; acquireWake();
-    const pc = Net.pc = makePC();
-    wireChannel(pc.createDataChannel('perils', { ordered: true }));
-    await pc.setLocalDescription(await pc.createOffer());
-    await gathered(pc);
-    const offerMsg = JSON.stringify({ type: 'OFFER', dst: 'perils-' + code + '-h', payload: { sdp: pc.localDescription } });
-    // re-send the offer on an interval: if the host phone was briefly asleep or
-    // backgrounded, it can still pick up a later offer once it wakes
-    await new Promise((resolve, reject) => {
-      let tries = 0;
-      const sendOffer = () => {
-        try { ws.send(offerMsg); } catch (e) {}
-        diag(tries === 0 ? 'guest: sent OFFER to ' + code + ', waiting for ANSWER…'
-                         : 'guest: resending OFFER (' + tries + ') — host not answering yet');
-      };
-      sendOffer();
-      const retry = setInterval(() => {
-        if (++tries > 9) { // ~30s total
-          clearInterval(retry);
-          reject(new Error('no reply — make sure the host is on the HOST ROOM screen with the phone awake'));
-          return;
-        }
-        sendOffer();
-      }, 3000);
-      ws.onmessage = async (m0) => {
-        let m; try { m = JSON.parse(m0.data); } catch (e) { return; }
-        if (m.type === 'ANSWER' && m.payload && m.payload.sdp) {
-          clearInterval(retry);
-          diag('guest: received host ANSWER');
-          await pc.setRemoteDescription(m.payload.sdp);
-          resolve();
-        } else if (m.type === 'EXPIRE' || m.type === 'LEAVE') {
-          clearInterval(retry);
-          diag('guest: room ' + m.type + ' — host is not in that room');
-          reject(new Error('room not found — check the code, and that the host tapped HOST ROOM'));
-        }
-      };
-    }).catch((err) => { Net._pairing = false; releaseWake(); throw err; });
-  };
 
   /* ---------------- connection ---------------- */
   function makePC(noStun) {
@@ -261,7 +132,7 @@
   }
   function wireChannel(dc) {
     Net.dc = dc;
-    dc.onopen = () => { diag('datachannel OPEN — connected ✔'); Net.active = true; Net.peerGone = false; Net._pairing = false; releaseWake(); closeSignaling(); if (Net.onOpen) Net.onOpen(); };
+    dc.onopen = () => { diag('datachannel OPEN — connected ✔'); Net.active = true; Net.peerGone = false; Net._pairing = false; releaseWake(); if (Net.onOpen) Net.onOpen(); };
     dc.onclose = () => { diag('datachannel closed'); Net.peerGone = true; if (Net.onClose) Net.onClose(); };
     dc.onerror = () => { diag('datachannel error'); Net.peerGone = true; };
     dc.onmessage = (e) => handle(JSON.parse(e.data));

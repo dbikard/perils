@@ -241,12 +241,6 @@ html, body {
   border: 1px solid rgba(86, 120, 170, 0.6);
   font-size: 11px; letter-spacing: 1px; font-weight: 700;
 }
-#coop-panel textarea {
-  width: 100%; height: 52px; resize: none; border-radius: 8px;
-  background: rgba(8, 12, 22, 0.9); color: #9fb6d8;
-  border: 1px solid rgba(86, 120, 170, 0.4);
-  font-size: 10px; padding: 6px; box-sizing: border-box;
-}
 #coop-status { font-size: 10px; color: #ffd166; letter-spacing: 1px; min-height: 14px; }
 #coop-diag {
   max-height: 132px; overflow-y: auto; margin: 0; text-align: left;
@@ -256,10 +250,6 @@ html, body {
   white-space: pre-wrap; word-break: break-word;
 }
 #coop-diag-copy {
-  background: none; border: none; cursor: pointer;
-  color: #5e77a0; font-size: 10px; letter-spacing: 1px; text-decoration: underline;
-}
-#relay-toggle, #coop-manual-toggle {
   background: none; border: none; cursor: pointer;
   color: #5e77a0; font-size: 10px; letter-spacing: 1px; text-decoration: underline;
 }
@@ -303,27 +293,3 @@ html, body {
   background: rgba(6, 10, 18, 0.92); border-radius: 14px; padding: 12px;
   border: 1px solid rgba(86, 120, 170, 0.5); }
 #levelup.mp .lvlup-head { font-size: 20px; }
-
-/* room-code flow */
-#coop-panel input#coop-code {
-  flex: 0 0 84px; text-align: center; text-transform: uppercase;
-  border-radius: 8px; background: rgba(8, 12, 22, 0.9); color: #fff;
-  border: 1px solid rgba(86, 120, 170, 0.6);
-  font-size: 16px; font-weight: 800; letter-spacing: 4px; padding: 6px 4px;
-}
-#coop-room {
-  min-height: 30px; text-align: center; color: #54ff9f;
-  font-size: 26px; font-weight: 800; letter-spacing: 10px;
-  text-shadow: 0 0 14px rgba(84, 255, 159, 0.6);
-}
-#coop-qr {
-  display: block; margin: 4px auto 0; width: 200px; height: auto;
-  max-width: 70vw; image-rendering: pixelated;
-  border: 6px solid #e8f1ff; border-radius: 8px;
-  box-shadow: 0 0 18px rgba(56, 232, 255, 0.35);
-}
-#coop-manual-toggle {
-  background: none; border: none; cursor: pointer;
-  color: #5e77a0; font-size: 10px; letter-spacing: 1px; text-decoration: underline;
-}
-#coop-manual { display: flex; flex-direction: column; gap: 8px; }

@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Perils">
   <title>Perils</title>
-  <link rel="manifest" href="manifest.json?v=0.6.24">
+  <link rel="manifest" href="manifest.json?v=0.6.25">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=0.6.24">
+  <link rel="stylesheet" href="styles.css?v=0.6.25">
 </head>
 <body>
   <canvas id="game"></canvas>
@@ -31,7 +31,7 @@
 
   <!-- Start menu -->
   <div id="menu">
-    <img id="portrait" src="sprites/ace_portrait.png?v=0.6.24" alt="Ace">
+    <img id="portrait" src="sprites/ace_portrait.png?v=0.6.25" alt="Ace">
     <h1>PERILS</h1>
     <p class="tagline">The ship is lost. Survive until the warp drive charges &mdash; then run.</p>
     <div id="stage-select">
@@ -41,7 +41,7 @@
     <button id="start-btn">LAUNCH</button>
     <button id="coop-toggle">CO-OP · LAN (beta)</button>
     <div id="coop-panel" class="hidden">
-      <!-- primary: serverless QR pairing — no server, same Wi-Fi only -->
+      <!-- serverless QR pairing — no server, same Wi-Fi only -->
       <div class="coop-row">
         <button id="qr-host">HOST GAME</button>
         <button id="qr-join">JOIN · SCAN</button>
@@ -49,28 +49,6 @@
       <canvas id="qr-display" class="hidden" aria-label="Pairing QR code"></canvas>
       <button id="qr-scan-reply" class="hidden">▸ SCAN PARTNER'S REPLY</button>
       <div id="coop-status">HOST shows a QR; the other taps JOIN and scans it, then shows a reply QR for the host to scan back. Same Wi-Fi, no internet needed.</div>
-
-      <!-- fallback: online room code via relay -->
-      <button id="relay-toggle">online room code ▾</button>
-      <div id="relay-flow" class="hidden">
-        <div class="coop-row">
-          <button id="coop-host">HOST ROOM</button>
-          <input id="coop-code" maxlength="4" placeholder="CODE" autocapitalize="characters" autocomplete="off" spellcheck="false">
-          <button id="coop-join">JOIN</button>
-        </div>
-        <div id="coop-room"></div>
-        <canvas id="coop-qr" class="hidden" aria-label="Scan to join room"></canvas>
-      </div>
-      <button id="coop-manual-toggle">offline copy-paste ▾</button>
-      <div id="coop-manual" class="hidden">
-        <textarea id="coop-out" readonly placeholder="your link code appears here — send it to your partner"></textarea>
-        <button id="coop-copy">COPY CODE</button>
-        <textarea id="coop-in" placeholder="paste your partner's code here"></textarea>
-        <div class="coop-row">
-          <button id="coop-mhost">1 · CREATE CODE</button>
-          <button id="coop-accept">2 · ACCEPT THEIRS</button>
-        </div>
-      </div>
       <pre id="coop-diag" class="hidden" aria-live="polite"></pre>
       <button id="coop-diag-copy" class="hidden">copy diagnostics</button>
     </div>
@@ -88,29 +66,29 @@
   </div>
 
   <script>
-    window.GAME_VERSION = '0.6.24'; // window property so global.GAME_VERSION resolves
+    window.GAME_VERSION = '0.6.25'; // window property so global.GAME_VERSION resolves
     // register the service worker (required for PWA install on modern Chrome)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=0.6.24', { scope: './', updateViaCache: 'none' }).catch(() => {});
+        navigator.serviceWorker.register('sw.js?v=0.6.25', { scope: './', updateViaCache: 'none' }).catch(() => {});
       });
     }
   </script>
-  <script src="js/engine.js?v=0.6.24"></script>
-  <script src="js/net.js?v=0.6.24"></script>
-  <script src="js/qrcode.js?v=0.6.24"></script>
-  <script src="js/sprites.js?v=0.6.24"></script>
-  <script src="js/particles.js?v=0.6.24"></script>
-  <script src="js/sfx.js?v=0.6.24"></script>
-  <script src="js/mapgen.js?v=0.6.24"></script>
-  <script src="js/render.js?v=0.6.24"></script>
-  <script src="js/entities.js?v=0.6.24"></script>
-  <script src="js/weapons.js?v=0.6.24"></script>
-  <script src="js/abilities.js?v=0.6.24"></script>
-  <script src="js/enemies.js?v=0.6.24"></script>
-  <script src="js/upgrades.js?v=0.6.24"></script>
-  <script src="js/meta.js?v=0.6.24"></script>
-  <script src="js/ui.js?v=0.6.24"></script>
-  <script src="js/game.js?v=0.6.24"></script>
+  <script src="js/engine.js?v=0.6.25"></script>
+  <script src="js/net.js?v=0.6.25"></script>
+  <script src="js/qrcode.js?v=0.6.25"></script>
+  <script src="js/sprites.js?v=0.6.25"></script>
+  <script src="js/particles.js?v=0.6.25"></script>
+  <script src="js/sfx.js?v=0.6.25"></script>
+  <script src="js/mapgen.js?v=0.6.25"></script>
+  <script src="js/render.js?v=0.6.25"></script>
+  <script src="js/entities.js?v=0.6.25"></script>
+  <script src="js/weapons.js?v=0.6.25"></script>
+  <script src="js/abilities.js?v=0.6.25"></script>
+  <script src="js/enemies.js?v=0.6.25"></script>
+  <script src="js/upgrades.js?v=0.6.25"></script>
+  <script src="js/meta.js?v=0.6.25"></script>
+  <script src="js/ui.js?v=0.6.25"></script>
+  <script src="js/game.js?v=0.6.25"></script>
 </body>
 </html>
