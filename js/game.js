@@ -293,8 +293,19 @@
     const pk = game._localPick; game._localPick = -1;
     return { mx: mv.x, my: mv.y, b, pk };
   }
+  // quantize a raw sample to the compact wire form (must match net.js scheduleLocal:
+  // move vector packed as an integer ×100). Both SP and MP go through this so the
+  // de-quantize in toInput is consistent.
+  const INPUT_Q = 100;
+  function quantize(s) {
+    return {
+      mx: Math.max(-INPUT_Q, Math.min(INPUT_Q, Math.round(s.mx * INPUT_Q))),
+      my: Math.max(-INPUT_Q, Math.min(INPUT_Q, Math.round(s.my * INPUT_Q))),
+      b: s.b | 0, pk: s.pk == null ? -1 : s.pk
+    };
+  }
   function toInput(rec) {
-    return { mx: rec.mx, my: rec.my, blink: !!(rec.b & 1), special: !!(rec.b & 2),
+    return { mx: rec.mx / INPUT_Q, my: rec.my / INPUT_Q, blink: !!(rec.b & 1), special: !!(rec.b & 2),
       ult: !!(rec.b & 4), pick: rec.pk == null ? -1 : rec.pk };
   }
 
@@ -337,7 +348,7 @@
         game.announce('⚠ SYNC LOST — runs have diverged', 5);
       }
     } else {
-      game.inputs[0] = toInput(captureLocal());
+      game.inputs[0] = toInput(quantize(captureLocal()));
       simUpdate(dt);
       game.tick++;
     }
