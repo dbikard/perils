@@ -652,6 +652,33 @@
     ctx.restore();
   }
 
+  // co-op: edge arrow pointing to the partner when they're off-screen, tinted
+  // to their colour (Ace cyan, Nova violet) so you can keep track of each other
+  function drawPartnerArrow(ctx, game) {
+    const players = game.players;
+    if (!players || players.length < 2) return;
+    const me = game.localPlayer || players[0];
+    const mate = players[1 - me.idx];
+    if (!mate) return;
+    const s = global.Engine.worldToScreen(mate.x, mate.y);
+    const W = global.Engine.width, H = global.Engine.height, m = 40;
+    if (s.x > m && s.x < W - m && s.y > m && s.y < H - m) return; // partner on-screen
+    const col = mate.idx === 1 ? '#c48eff' : '#38e8ff';
+    const ang = Math.atan2(mate.y - me.y, mate.x - me.x);
+    const cx = Engine.clamp(s.x, m, W - m), cy = Engine.clamp(s.y, m, H - m);
+    ctx.save();
+    ctx.translate(cx, cy);
+    // teammate ring so it reads differently from the green escape arrow
+    ctx.globalAlpha = mate.dead ? 0.45 + 0.25 * Math.sin(game.timeSec * 6) : 0.95;
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 11, 0, Engine.TAU); ctx.stroke();
+    ctx.rotate(ang);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(11, -6); ctx.lineTo(11, 6); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
   Render.draw = function (game) {
     const ctx = global.Engine.ctx, W = global.Engine.width, H = global.Engine.height, cam = global.Engine.camera;
     ctx.fillStyle = '#05070d';
@@ -688,6 +715,7 @@
     drawHUDOverlay(ctx, game);
     drawBanner(ctx, game);
     drawEscapeArrow(ctx, game);
+    drawPartnerArrow(ctx, game);
     drawButtons(ctx, game);
   };
 

@@ -24,9 +24,11 @@
     // gentle linear HP growth, then a quadratic late-game wall (a maxed build
     // should still feel hunted at minute 5 — threat must outpace power slightly)
     const t = game.timeSec;
+    const pc = game.players ? game.players.length : 1;
     const hpScale = (1 + t * 0.007 + Math.max(0, t - 150) * Math.max(0, t - 150) * 0.0003)
-      * ((game.stageDef && game.stageDef.hpMult) || 1);
-    const dmgScale = 1 + game.timeSec * 0.003;
+      * ((game.stageDef && game.stageDef.hpMult) || 1)
+      * (1 + (pc - 1) * 0.35);                 // tankier with more players (counters stacked DPS)
+    const dmgScale = (1 + game.timeSec * 0.003) * (1 + (pc - 1) * 0.07);
     e.type = typeId; e.x = x; e.y = y; e.r = def.r;
     e.maxHp = def.hp * hpScale; e.hp = e.maxHp;
     e.speed = def.speed; e.damage = def.damage * dmgScale;
@@ -234,8 +236,8 @@
     // more players = more firepower (and revives), so scale the siege up to keep
     // the pressure honest. Tuned against the 2-player sim.
     const pc = game.players ? game.players.length : 1;
-    const playerScale = 1 + (pc - 1) * 1.35;   // shared XP makes a pair scale faster than 2x
-    const MAX = 300 + (pc - 1) * 180;
+    const playerScale = 1 + (pc - 1) * 1.8;    // 2 players (double DPS + revives) need a much heavier siege
+    const MAX = 300 + (pc - 1) * 280;
 
     // boss waves: every ~120s, tightening to 90s late
     game.bossTimer -= dt;

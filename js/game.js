@@ -569,8 +569,8 @@
     return best;
   }
 
-  // pull crystals within magnet radius toward the nearest player; collecting
-  // grants the XP to EVERY player (co-op shares progression, no competition)
+  // pull crystals within magnet radius toward the nearest player; only the
+  // collector banks the XP (co-op: grab your own, spread out to share the field)
   function updateCrystals(game, dt) {
     const list = game.crystals.active;
     for (let i = list.length - 1; i >= 0; i--) {
@@ -585,13 +585,11 @@
       }
       if (d2 < (p.r + c.r + 4) * (p.r + c.r + 4)) {
         if (global.Particles) global.Particles.sparkle(game, c.x, c.y, '#54ff9f');
-        for (const pl of game.players) {
-          pl.xp += c.value;
-          while (pl.xp >= pl.xpNext) {
-            pl.xp -= pl.xpNext; pl.level++;
-            pl.xpNext = Math.floor(pl.xpNext * 1.27 + 2);
-            pl.pendingLevels++;
-          }
+        p.xp += c.value;
+        while (p.xp >= p.xpNext) {
+          p.xp -= p.xpNext; p.level++;
+          p.xpNext = Math.floor(p.xpNext * 1.27 + 2);
+          p.pendingLevels++;
         }
         game.crystals.release(c);
       }
