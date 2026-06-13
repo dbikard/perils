@@ -827,14 +827,37 @@
      * host shows an offer QR → guest scans it and shows an answer QR →
      * host scans that. Reuses Net.host/join/acceptAnswer (compressed SDP). */
     const qrDisplay = $('qr-display'), qrScanReply = $('qr-scan-reply');
-    const showPairQR = (code) => {
+    let pairStop = null; // stops the currently-displayed QR stream
+
+    // Show a payload as a rapidly-cycling series of SMALL QR frames. One dense
+    // QR is hard for a phone camera to focus on; a stream of low-density frames
+    // (each easy to focus/decode) lets the scanner reassemble the chunks over a
+    // couple of loops. Frame = "PQ|<id>|<idx>|<total>|<chunk>" (chunk is
+    // base64url, so it never contains the '|' delimiter).
+    const startPairStream = (code) => {
       if (!qrDisplay || !global.QR) return false;
-      // high internal resolution (crisp when CSS-scaled) + wide quiet zone +
-      // pure black/white for the best chance the camera locks and decodes
-      try { global.QR.render(qrDisplay, code, { size: 720, quiet: 4, dark: '#000000', light: '#ffffff' }); qrDisplay.classList.remove('hidden'); return true; }
-      catch (e) { qrDisplay.classList.add('hidden'); return false; }
+      if (pairStop) { pairStop(); pairStop = null; }
+      const id = Math.random().toString(36).slice(2, 6);
+      const CH = 90;
+      const chunks = [];
+      for (let i = 0; i < code.length; i += CH) chunks.push(code.slice(i, i + CH));
+      const n = chunks.length;
+      let i = 0, timer = null;
+      const frame = () => {
+        try { global.QR.render(qrDisplay, 'PQ|' + id + '|' + i + '|' + n + '|' + chunks[i], { size: 560, quiet: 4, dark: '#000000', light: '#ffffff' }); } catch (e) {}
+        i = (i + 1) % n;
+      };
+      qrDisplay.classList.remove('hidden');
+      frame();
+      if (n > 1) timer = setInterval(frame, 420); // ~2.4 frames/sec: slow enough to focus
+      pairStop = () => { if (timer) clearInterval(timer); timer = null; };
+      return true;
     };
-    const hidePairUI = () => { if (qrDisplay) qrDisplay.classList.add('hidden'); if (qrScanReply) qrScanReply.classList.add('hidden'); };
+    const hidePairUI = () => {
+      if (pairStop) { pairStop(); pairStop = null; }
+      if (qrDisplay) qrDisplay.classList.add('hidden');
+      if (qrScanReply) qrScanReply.classList.add('hidden');
+    };
 
     // open the camera, scan one QR, resolve its text. Android Chrome has
     // BarcodeDetector; browsers without it fall back to copy-paste pairing.
@@ -866,22 +889,38 @@
         } catch (e) { /* focus control unsupported — rely on device default */ }
         video.srcObject = stream; try { await video.play(); } catch (e) {}
         if (overlay) overlay.classList.remove('hidden');
+        const hint = $('scan-hint');
+        if (hint) hint.textContent = 'Point at your partner’s QR code';
         let done = false;
         const snap = document.createElement('canvas');
         const sctx = snap.getContext('2d');
         const cleanup = () => { done = true; if (overlay) overlay.classList.add('hidden'); stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; };
         if (cancel) cancel.onclick = () => { cleanup(); reject(new Error('scan cancelled')); };
+        // reassemble the streamed chunks: "PQ|<id>|<idx>|<total>|<chunk>"
+        const parts = {}; let pid = null, need = 0, have = 0;
         const tick = async () => {
           if (done) return;
           try {
-            // detect off a snapshot canvas — more reliable than a <video> on
-            // some Android devices — and check both orientations
+            // detect off a snapshot canvas — more reliable than a <video> on some Android devices
             let src = video;
             if (video.videoWidth) { snap.width = video.videoWidth; snap.height = video.videoHeight; sctx.drawImage(video, 0, 0); src = snap; }
             const codes = await detector.detect(src);
-            if (codes && codes.length && codes[0].rawValue) { const v = codes[0].rawValue; cleanup(); resolve(v); return; }
+            for (let ci = 0; codes && ci < codes.length; ci++) {
+              const v = codes[ci].rawValue; if (!v) continue;
+              if (v.slice(0, 3) !== 'PQ|') { cleanup(); resolve(v); return; } // a whole (non-streamed) code
+              const p = v.split('|'); // PQ, id, idx, total, chunk
+              if (p.length < 5) continue;
+              const id = p[1], idx = +p[2], total = +p[3];
+              if (pid !== id) { pid = id; need = total; have = 0; for (const k in parts) delete parts[k]; }
+              if (parts[idx] == null) { parts[idx] = p.slice(4).join('|'); have++; if (hint) hint.textContent = 'scanning… ' + have + '/' + need; }
+              if (need > 0 && have >= need) {
+                let full = '', ok = true;
+                for (let k = 0; k < need; k++) { if (parts[k] == null) { ok = false; break; } full += parts[k]; }
+                if (ok) { cleanup(); resolve(full); return; }
+              }
+            }
           } catch (e) { /* transient detect error — keep scanning */ }
-          if (!done) setTimeout(() => requestAnimationFrame(tick), 80); // ~12fps: gentler, lets autofocus settle
+          if (!done) setTimeout(() => requestAnimationFrame(tick), 60);
         };
         requestAnimationFrame(tick);
       });
@@ -891,14 +930,16 @@
       if (Net.diagReset) Net.diagReset();
       say('creating game…');
       try {
-        const offer = await Net.host(true); // local = LAN only (no STUN → smaller QR)
-        if (!showPairQR(offer)) { say('could not build QR — use offline copy-paste'); return; }
+        const offer = await Net.host(true); // local = LAN only (no STUN → smaller code)
+        if (!startPairStream(offer)) { say('could not build QR — use offline copy-paste'); return; }
         if (qrScanReply) qrScanReply.classList.remove('hidden');
-        say('1) show this QR to your partner   2) tap “SCAN PARTNER’S REPLY”');
+        say('1) let your partner scan this   2) tap “SCAN PARTNER’S REPLY”');
       } catch (e) { say('failed: ' + ((e && e.message) || e)); }
     });
     if (qrScanReply) qrScanReply.addEventListener('click', async () => {
       try {
+        if (pairStop) { pairStop(); pairStop = null; } // stop showing our offer; partner has it
+        if (qrDisplay) qrDisplay.classList.add('hidden');
         const answer = await scanQR();
         say('linking…');
         await Net.acceptAnswer(answer);
@@ -911,8 +952,8 @@
         const offer = await scanQR();
         say('building reply…');
         const answer = await Net.join(offer, true);
-        if (!showPairQR(answer)) { say('could not build reply QR'); return; }
-        say('show this reply QR to the host — connecting…');
+        if (!startPairStream(answer)) { say('could not build reply QR'); return; }
+        say('show this reply to the host — connecting…');
       } catch (e) { say(e.message); }
     });
 
