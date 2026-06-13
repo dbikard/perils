@@ -12,11 +12,20 @@
 (function (global) {
   'use strict';
 
-  const MIN_VER = 1, MAX_VER = 10;
-  // error-correction level M, indexed by version (1..10):
-  const ECC_PER_BLOCK = [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];
-  const NUM_BLOCKS    = [-1,  1,  1,  1,  2,  2,  4,  4,  4,  5,  5];
-  const FORMAT_BITS_ECL = 0; // 2-bit field value for level M
+  const MIN_VER = 1, MAX_VER = 40;
+  // error-correction level L (max capacity, fine for on-screen scanning),
+  // indexed by version (1..40):
+  const ECC_PER_BLOCK = [-1,
+     7, 10, 15, 20, 26, 18, 20, 24, 30, 18,
+    20, 24, 26, 30, 22, 24, 28, 30, 28, 28,
+    28, 28, 30, 30, 26, 28, 30, 30, 30, 30,
+    30, 30, 30, 30, 30, 30, 30, 30, 30, 30];
+  const NUM_BLOCKS = [-1,
+     1,  1,  1,  1,  1,  2,  2,  2,  2,  4,
+     4,  4,  4,  4,  6,  6,  6,  6,  7,  8,
+     8,  9,  9, 10, 12, 12, 12, 13, 14, 15,
+    16, 17, 18, 19, 19, 20, 21, 22, 24, 25];
+  const FORMAT_BITS_ECL = 1; // 2-bit field value for level L
 
   /* ---- Galois field GF(256) arithmetic (Reed-Solomon, primitive poly 0x11D) ---- */
   function rsMul(x, y) {
