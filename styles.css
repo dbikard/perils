@@ -234,6 +234,17 @@ html, body {
   font-size: 10px; padding: 6px; box-sizing: border-box;
 }
 #coop-status { font-size: 10px; color: #ffd166; letter-spacing: 1px; min-height: 14px; }
+#coop-diag {
+  max-height: 132px; overflow-y: auto; margin: 0; text-align: left;
+  font-family: ui-monospace, Menlo, monospace; font-size: 9px; line-height: 1.45;
+  color: #8fb0d8; background: rgba(4, 8, 16, 0.92);
+  border: 1px solid rgba(86, 120, 170, 0.4); border-radius: 8px; padding: 8px;
+  white-space: pre-wrap; word-break: break-word;
+}
+#coop-diag-copy {
+  background: none; border: none; cursor: pointer;
+  color: #5e77a0; font-size: 10px; letter-spacing: 1px; text-decoration: underline;
+}
 
 /* co-op choice sheet: compact, non-blocking (game keeps running behind it) */
 #levelup.mp { background: transparent; pointer-events: none; align-items: flex-end; }

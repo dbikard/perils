@@ -752,12 +752,27 @@
     const $ = (id) => document.getElementById(id);
     const panel = $('coop-panel'), status = $('coop-status');
     const out = $('coop-out'), inp = $('coop-in'), room = $('coop-room');
+    const diagEl = $('coop-diag'), diagCopy = $('coop-diag-copy');
     const say = (s) => { if (status) status.textContent = s; };
+
+    // live handshake log: reveal the panel + copy button once anything happens
+    Net.onDiag = (lines) => {
+      if (!diagEl) return;
+      diagEl.textContent = lines.join('\n');
+      diagEl.classList.remove('hidden');
+      if (diagCopy) diagCopy.classList.remove('hidden');
+      diagEl.scrollTop = diagEl.scrollHeight;
+    };
+    if (diagCopy) diagCopy.addEventListener('click', () => {
+      const txt = Net.diagText ? Net.diagText() : '';
+      if (txt && navigator.clipboard) { navigator.clipboard.writeText(txt); diagCopy.textContent = 'copied ✔'; setTimeout(() => { diagCopy.textContent = 'copy diagnostics'; }, 1500); }
+    });
 
     $('coop-toggle').addEventListener('click', () => panel.classList.toggle('hidden'));
 
     // room-code flow
     $('coop-host').addEventListener('click', async () => {
+      if (Net.diagReset) Net.diagReset();
       say('opening room…');
       try {
         const code = await Net.hostRoom(say);
@@ -768,6 +783,7 @@
       }
     });
     $('coop-join').addEventListener('click', async () => {
+      if (Net.diagReset) Net.diagReset();
       try {
         say('joining…');
         await Net.joinRoom($('coop-code').value);
