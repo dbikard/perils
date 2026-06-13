@@ -796,15 +796,14 @@
     global.addEventListener('keydown', (e) => { if (e.key && e.key.toLowerCase() === 'f' && canFS) toggleFS(); });
   }
 
-  /* co-op lobby. Primary flow: host opens a room, partner types its 4-letter
-   * code (handshake relayed through a free public signaling service; gameplay
-   * stays LAN peer-to-peer). Fallback: serverless copy-paste link codes. */
+  /* co-op lobby — serverless QR pairing: the host shows an offer QR, the guest
+   * scans it and shows a reply QR, the host scans that back. No signaling
+   * server; gameplay runs peer-to-peer over the LAN. */
   function setupCoopMenu() {
     const Net = global.Net;
     if (!Net || typeof RTCPeerConnection === 'undefined') return;
     const $ = (id) => document.getElementById(id);
     const panel = $('coop-panel'), status = $('coop-status');
-    const out = $('coop-out'), inp = $('coop-in'), room = $('coop-room');
     const diagEl = $('coop-diag'), diagCopy = $('coop-diag-copy');
     const say = (s) => { if (status) status.textContent = s; };
 
@@ -821,18 +820,7 @@
       if (txt && navigator.clipboard) { navigator.clipboard.writeText(txt); diagCopy.textContent = 'copied ✔'; setTimeout(() => { diagCopy.textContent = 'copy diagnostics'; }, 1500); }
     });
 
-    const qr = $('coop-qr');
-    // join URL = this page with a #room=CODE marker; partner scans → auto-joins
-    const joinURL = (code) => location.href.split('#')[0] + '#room=' + code;
-    const showQR = (code) => {
-      if (!qr || !global.QR) return;
-      try { global.QR.render(qr, joinURL(code), { size: 232, dark: '#05070d', light: '#e8f1ff' }); qr.classList.remove('hidden'); }
-      catch (e) { qr.classList.add('hidden'); }
-    };
-
     $('coop-toggle').addEventListener('click', () => panel.classList.toggle('hidden'));
-    const relayToggle = $('relay-toggle'), relayFlow = $('relay-flow');
-    if (relayToggle && relayFlow) relayToggle.addEventListener('click', () => relayFlow.classList.toggle('hidden'));
 
     /* ---- serverless QR pairing (no signaling server; same Wi-Fi) ----
      * host shows an offer QR → guest scans it and shows an answer QR →
@@ -942,7 +930,7 @@
       say('creating game…');
       try {
         const offer = await Net.host(true); // local = LAN only (no STUN → smaller code)
-        if (!startPairStream(offer)) { say('could not build QR — use offline copy-paste'); return; }
+        if (!startPairStream(offer)) { say('could not build QR'); return; }
         if (qrScanReply) qrScanReply.classList.remove('hidden');
         say('1) let your partner scan this   2) tap “SCAN PARTNER’S REPLY”');
       } catch (e) { say('failed: ' + ((e && e.message) || e)); }
@@ -968,56 +956,7 @@
       } catch (e) { say(e.message); }
     });
 
-    // room-code flow
-    $('coop-host').addEventListener('click', async () => {
-      if (Net.diagReset) Net.diagReset();
-      say('opening room…');
-      try {
-        const code = await Net.hostRoom(say);
-        room.textContent = code;
-        showQR(code);
-        say('partner scans this QR with their camera (or types ' + code + ')');
-      } catch (e) {
-        say('room service unreachable — use offline pairing below');
-      }
-    });
-    $('coop-join').addEventListener('click', async () => {
-      if (Net.diagReset) Net.diagReset();
-      try {
-        say('joining…');
-        await Net.joinRoom($('coop-code').value);
-      } catch (e) { say(e.message); }
-    });
-
-    // offline fallback: manual link codes; the second device just pastes the
-    // first device's code and ACCEPTs — roles are inferred
-    $('coop-manual-toggle').addEventListener('click', () => $('coop-manual').classList.toggle('hidden'));
-    $('coop-mhost').addEventListener('click', async () => {
-      say('creating link code…');
-      try {
-        out.value = await Net.host();
-        say('send the code to your partner; paste their reply and ACCEPT');
-      } catch (e) { say('failed: ' + e.message); }
-    });
-    $('coop-accept').addEventListener('click', async () => {
-      const code = inp.value.trim();
-      if (!code) { say('paste a code first'); return; }
-      try {
-        say('connecting…');
-        if (Net.pc && Net.isHost) {
-          await Net.acceptAnswer(code);       // host finishing the handshake
-        } else {
-          out.value = await Net.join(code);   // guest answering the host's code
-          say('send this reply code back — connecting…');
-        }
-      } catch (e) { say('bad code: ' + e.message); }
-    });
-    $('coop-copy').addEventListener('click', () => {
-      if (out.value && navigator.clipboard) navigator.clipboard.writeText(out.value);
-    });
-
     Net.onOpen = () => {
-      if (qr) qr.classList.add('hidden'); // paired — no need for the code anymore
       hidePairUI();
       say(Net.isHost ? 'CONNECTED — press LAUNCH to start the run' : 'CONNECTED — waiting for the host to launch');
       const sb = document.getElementById('start-btn');
@@ -1028,19 +967,6 @@
       if (game.phase === 'PLAYING' || game.phase === 'ESCAPE') game.announce('PARTNER LINK LOST — going it alone', 4);
       else say('disconnected');
     };
-
-    // scanned-a-QR / opened-a-join-link flow: #room=CODE → auto-join, no typing
-    const hashMatch = /[#&]room=([A-Za-z0-9]{4,8})/.exec(location.hash || '');
-    if (hashMatch) {
-      const code = hashMatch[1].toUpperCase();
-      panel.classList.remove('hidden');
-      if ($('coop-code')) $('coop-code').value = code;
-      // strip the marker so a reload doesn't re-trigger
-      try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
-      if (Net.diagReset) Net.diagReset();
-      say('joining ' + code + '…');
-      Net.joinRoom(code).catch((e) => say(e.message));
-    }
   }
 
   if (hasDOM) {
