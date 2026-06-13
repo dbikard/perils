@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Perils">
   <title>Perils</title>
-  <link rel="manifest" href="manifest.json?v=0.6.12">
+  <link rel="manifest" href="manifest.json?v=0.6.13">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=0.6.12">
+  <link rel="stylesheet" href="styles.css?v=0.6.13">
 </head>
 <body>
   <canvas id="game"></canvas>
@@ -31,7 +31,7 @@
 
   <!-- Start menu -->
   <div id="menu">
-    <img id="portrait" src="sprites/ace_portrait.png?v=0.6.12" alt="Ace">
+    <img id="portrait" src="sprites/ace_portrait.png?v=0.6.13" alt="Ace">
     <h1>PERILS</h1>
     <p class="tagline">The ship is lost. Survive until the warp drive charges &mdash; then run.</p>
     <div id="stage-select">
@@ -68,29 +68,29 @@
   </div>
 
   <script>
-    window.GAME_VERSION = '0.6.12'; // window property so global.GAME_VERSION resolves
+    window.GAME_VERSION = '0.6.13'; // window property so global.GAME_VERSION resolves
     // register the service worker (required for PWA install on modern Chrome)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=0.6.12', { scope: './', updateViaCache: 'none' }).catch(() => {});
+        navigator.serviceWorker.register('sw.js?v=0.6.13', { scope: './', updateViaCache: 'none' }).catch(() => {});
       });
     }
   </script>
-  <script src="js/engine.js?v=0.6.12"></script>
-  <script src="js/net.js?v=0.6.12"></script>
-  <script src="js/qrcode.js?v=0.6.12"></script>
-  <script src="js/sprites.js?v=0.6.12"></script>
-  <script src="js/particles.js?v=0.6.12"></script>
-  <script src="js/sfx.js?v=0.6.12"></script>
-  <script src="js/mapgen.js?v=0.6.12"></script>
-  <script src="js/render.js?v=0.6.12"></script>
-  <script src="js/entities.js?v=0.6.12"></script>
-  <script src="js/weapons.js?v=0.6.12"></script>
-  <script src="js/abilities.js?v=0.6.12"></script>
-  <script src="js/enemies.js?v=0.6.12"></script>
-  <script src="js/upgrades.js?v=0.6.12"></script>
-  <script src="js/meta.js?v=0.6.12"></script>
-  <script src="js/ui.js?v=0.6.12"></script>
-  <script src="js/game.js?v=0.6.12"></script>
+  <script src="js/engine.js?v=0.6.13"></script>
+  <script src="js/net.js?v=0.6.13"></script>
+  <script src="js/qrcode.js?v=0.6.13"></script>
+  <script src="js/sprites.js?v=0.6.13"></script>
+  <script src="js/particles.js?v=0.6.13"></script>
+  <script src="js/sfx.js?v=0.6.13"></script>
+  <script src="js/mapgen.js?v=0.6.13"></script>
+  <script src="js/render.js?v=0.6.13"></script>
+  <script src="js/entities.js?v=0.6.13"></script>
+  <script src="js/weapons.js?v=0.6.13"></script>
+  <script src="js/abilities.js?v=0.6.13"></script>
+  <script src="js/enemies.js?v=0.6.13"></script>
+  <script src="js/upgrades.js?v=0.6.13"></script>
+  <script src="js/meta.js?v=0.6.13"></script>
+  <script src="js/ui.js?v=0.6.13"></script>
+  <script src="js/game.js?v=0.6.13"></script>
 </body>
 </html>
