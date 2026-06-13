@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Perils">
   <title>Perils</title>
-  <link rel="manifest" href="manifest.json?v=0.6.3">
+  <link rel="manifest" href="manifest.json?v=0.6.7">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=0.6.3">
+  <link rel="stylesheet" href="styles.css?v=0.6.7">
 </head>
 <body>
   <canvas id="game"></canvas>
@@ -30,7 +30,7 @@
 
   <!-- Start menu -->
   <div id="menu">
-    <img id="portrait" src="sprites/ace_portrait.png?v=0.6.3" alt="Ace">
+    <img id="portrait" src="sprites/ace_portrait.png?v=0.6.7" alt="Ace">
     <h1>PERILS</h1>
     <p class="tagline">The ship is lost. Survive until the warp drive charges &mdash; then run.</p>
     <div id="stage-select">
@@ -46,7 +46,8 @@
         <button id="coop-join">JOIN</button>
       </div>
       <div id="coop-room"></div>
-      <div id="coop-status">one phone hosts and reads out the room code; the other enters it and joins</div>
+      <canvas id="coop-qr" class="hidden" aria-label="Scan to join room"></canvas>
+      <div id="coop-status">one phone hosts and shows a QR code; the other scans it with their camera to join (or types the code)</div>
       <button id="coop-manual-toggle">no internet? offline pairing ▾</button>
       <div id="coop-manual" class="hidden">
         <textarea id="coop-out" readonly placeholder="your link code appears here — send it to your partner"></textarea>
@@ -57,27 +58,30 @@
           <button id="coop-accept">2 · ACCEPT THEIRS</button>
         </div>
       </div>
+      <pre id="coop-diag" class="hidden" aria-live="polite"></pre>
+      <button id="coop-diag-copy" class="hidden">copy diagnostics</button>
     </div>
     <p id="menu-stats"></p>
     <p class="hint">Move: drag (left) or WASD / arrows &nbsp;·&nbsp; Blink: ⟶ / Space &nbsp;·&nbsp; Special: Q &nbsp;·&nbsp; Ultimate: ⚡ / E</p>
     <p class="version"></p>
   </div>
 
-  <script>const GAME_VERSION = '0.6.3';</script>
-  <script src="js/engine.js?v=0.6.3"></script>
-  <script src="js/net.js?v=0.6.3"></script>
-  <script src="js/sprites.js?v=0.6.3"></script>
-  <script src="js/particles.js?v=0.6.3"></script>
-  <script src="js/sfx.js?v=0.6.3"></script>
-  <script src="js/mapgen.js?v=0.6.3"></script>
-  <script src="js/render.js?v=0.6.3"></script>
-  <script src="js/entities.js?v=0.6.3"></script>
-  <script src="js/weapons.js?v=0.6.3"></script>
-  <script src="js/abilities.js?v=0.6.3"></script>
-  <script src="js/enemies.js?v=0.6.3"></script>
-  <script src="js/upgrades.js?v=0.6.3"></script>
-  <script src="js/meta.js?v=0.6.3"></script>
-  <script src="js/ui.js?v=0.6.3"></script>
-  <script src="js/game.js?v=0.6.3"></script>
+  <script>const GAME_VERSION = '0.6.7';</script>
+  <script src="js/engine.js?v=0.6.7"></script>
+  <script src="js/net.js?v=0.6.7"></script>
+  <script src="js/qrcode.js?v=0.6.7"></script>
+  <script src="js/sprites.js?v=0.6.7"></script>
+  <script src="js/particles.js?v=0.6.7"></script>
+  <script src="js/sfx.js?v=0.6.7"></script>
+  <script src="js/mapgen.js?v=0.6.7"></script>
+  <script src="js/render.js?v=0.6.7"></script>
+  <script src="js/entities.js?v=0.6.7"></script>
+  <script src="js/weapons.js?v=0.6.7"></script>
+  <script src="js/abilities.js?v=0.6.7"></script>
+  <script src="js/enemies.js?v=0.6.7"></script>
+  <script src="js/upgrades.js?v=0.6.7"></script>
+  <script src="js/meta.js?v=0.6.7"></script>
+  <script src="js/ui.js?v=0.6.7"></script>
+  <script src="js/game.js?v=0.6.7"></script>
 </body>
 </html>

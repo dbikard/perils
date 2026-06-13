@@ -1,0 +1,30 @@
+#!/bin/sh
+# Auto-bump the patch version in index.html on every commit.
+#
+# Keeps GAME_VERSION and every ?v=X.Y.Z asset query string in sync so the
+# browser cache-busts all assets whenever code changes — players who reload
+# always get the newest build. Portable POSIX sh (works on macOS and Linux).
+#
+# Enable once per clone with:
+#     git config core.hooksPath .githooks
+set -e
+
+INDEX="index.html"
+[ -f "$INDEX" ] || exit 0
+
+# read the current version out of  const GAME_VERSION = 'X.Y.Z';
+cur=$(sed -n "s/.*GAME_VERSION = '\([0-9]*\.[0-9]*\.[0-9]*\)'.*/\1/p" "$INDEX" | head -n1)
+[ -n "$cur" ] || { echo "pre-commit: no GAME_VERSION found, skipping bump" >&2; exit 0; }
+
+major=${cur%%.*}
+rest=${cur#*.}
+minor=${rest%%.*}
+patch=${rest##*.}
+next="$major.$minor.$((patch + 1))"
+
+# replace every occurrence of the exact current version (dots escaped)
+cur_re=$(printf '%s' "$cur" | sed 's/\./\\./g')
+tmp=$(mktemp)
+sed "s/$cur_re/$next/g" "$INDEX" > "$tmp" && mv "$tmp" "$INDEX"
+git add "$INDEX"
+echo "pre-commit: bumped version $cur -> $next"

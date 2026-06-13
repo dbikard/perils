@@ -705,7 +705,27 @@
     E.initCanvas(document.getElementById('game'));
     global.Sprites.load();
     const v = document.querySelector('#menu .version');
-    if (v) v.textContent = 'v' + (global.GAME_VERSION || '0.0.0');
+    if (v) {
+      v.textContent = 'v' + (global.GAME_VERSION || '0.0.0') + ' ';
+      // force a fresh fetch of index.html (and thus the newest ?v= assets),
+      // bypassing any cached HTML so players can self-update without a hard reload
+      const r = document.createElement('button');
+      r.id = 'refresh-btn'; r.type = 'button';
+      r.textContent = '⟳ update';
+      r.title = 'Reload the latest version';
+      r.addEventListener('click', async () => {
+        r.textContent = 'updating…';
+        try {
+          if (global.caches) { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); }
+          if (global.navigator && navigator.serviceWorker) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((reg) => reg.unregister()));
+          }
+        } catch (e) { /* best-effort cache clear */ }
+        location.replace(location.pathname + '?fresh=' + Date.now()); // cache-busted reload
+      });
+      v.appendChild(r);
+    }
     document.getElementById('start-btn').addEventListener('click', () => {
       const Net = global.Net;
       if (Net && Net.active) {
@@ -752,22 +772,48 @@
     const $ = (id) => document.getElementById(id);
     const panel = $('coop-panel'), status = $('coop-status');
     const out = $('coop-out'), inp = $('coop-in'), room = $('coop-room');
+    const diagEl = $('coop-diag'), diagCopy = $('coop-diag-copy');
     const say = (s) => { if (status) status.textContent = s; };
+
+    // live handshake log: reveal the panel + copy button once anything happens
+    Net.onDiag = (lines) => {
+      if (!diagEl) return;
+      diagEl.textContent = lines.join('\n');
+      diagEl.classList.remove('hidden');
+      if (diagCopy) diagCopy.classList.remove('hidden');
+      diagEl.scrollTop = diagEl.scrollHeight;
+    };
+    if (diagCopy) diagCopy.addEventListener('click', () => {
+      const txt = Net.diagText ? Net.diagText() : '';
+      if (txt && navigator.clipboard) { navigator.clipboard.writeText(txt); diagCopy.textContent = 'copied ✔'; setTimeout(() => { diagCopy.textContent = 'copy diagnostics'; }, 1500); }
+    });
+
+    const qr = $('coop-qr');
+    // join URL = this page with a #room=CODE marker; partner scans → auto-joins
+    const joinURL = (code) => location.href.split('#')[0] + '#room=' + code;
+    const showQR = (code) => {
+      if (!qr || !global.QR) return;
+      try { global.QR.render(qr, joinURL(code), { size: 232, dark: '#05070d', light: '#e8f1ff' }); qr.classList.remove('hidden'); }
+      catch (e) { qr.classList.add('hidden'); }
+    };
 
     $('coop-toggle').addEventListener('click', () => panel.classList.toggle('hidden'));
 
     // room-code flow
     $('coop-host').addEventListener('click', async () => {
+      if (Net.diagReset) Net.diagReset();
       say('opening room…');
       try {
         const code = await Net.hostRoom(say);
         room.textContent = code;
-        say('waiting for partner — they enter this code and tap JOIN');
+        showQR(code);
+        say('partner scans this QR with their camera (or types ' + code + ')');
       } catch (e) {
         say('room service unreachable — use offline pairing below');
       }
     });
     $('coop-join').addEventListener('click', async () => {
+      if (Net.diagReset) Net.diagReset();
       try {
         say('joining…');
         await Net.joinRoom($('coop-code').value);
@@ -802,6 +848,7 @@
     });
 
     Net.onOpen = () => {
+      if (qr) qr.classList.add('hidden'); // paired — no need for the code anymore
       say(Net.isHost ? 'CONNECTED — press LAUNCH to start the run' : 'CONNECTED — waiting for the host to launch');
       const sb = document.getElementById('start-btn');
       if (!Net.isHost) sb.textContent = 'WAITING FOR HOST…';
@@ -811,6 +858,19 @@
       if (game.phase === 'PLAYING' || game.phase === 'ESCAPE') game.announce('PARTNER LINK LOST — going it alone', 4);
       else say('disconnected');
     };
+
+    // scanned-a-QR / opened-a-join-link flow: #room=CODE → auto-join, no typing
+    const hashMatch = /[#&]room=([A-Za-z0-9]{4,8})/.exec(location.hash || '');
+    if (hashMatch) {
+      const code = hashMatch[1].toUpperCase();
+      panel.classList.remove('hidden');
+      if ($('coop-code')) $('coop-code').value = code;
+      // strip the marker so a reload doesn't re-trigger
+      try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
+      if (Net.diagReset) Net.diagReset();
+      say('joining ' + code + '…');
+      Net.joinRoom(code).catch((e) => say(e.message));
+    }
   }
 
   if (hasDOM) {

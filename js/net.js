@@ -25,8 +25,31 @@
     onOpen: null, onStart: null, onClose: null,
     inputs: [new Map(), new Map()],   // tick -> input record, per player
     hashes: new Map(),                // tick -> our hash (for cross-check)
-    _lastScheduled: -1
+    _lastScheduled: -1,
+    diag: [],                         // rolling handshake log (surfaced in the lobby)
+    onDiag: null
   };
+
+  /* ---------------- handshake diagnostics ---------------- */
+  // The LAN handshake has several failure points (signaling socket, ICE
+  // gathering, ICE connectivity, datachannel). Log each transition so a stuck
+  // pairing can be diagnosed from the screen instead of a hidden console.
+  function diag(msg) {
+    const t = (typeof performance !== 'undefined' ? performance.now() / 1000 : Date.now() / 1000).toFixed(1);
+    Net.diag.push(t + 's  ' + msg);
+    if (Net.diag.length > 50) Net.diag.shift();
+    if (Net.onDiag) Net.onDiag(Net.diag);
+  }
+  Net.diag = []; // ensure array even if frozen elsewhere
+  Net.diagReset = function () {
+    Net.diag = [];
+    if (typeof navigator !== 'undefined') {
+      diag('secureContext=' + (typeof isSecureContext !== 'undefined' ? isSecureContext : '?') +
+           '  RTC=' + (typeof RTCPeerConnection !== 'undefined') +
+           '  compress=' + (typeof CompressionStream !== 'undefined'));
+    }
+  };
+  Net.diagText = function () { return Net.diag.join('\n'); };
 
   /* ---------------- link codes (compressed base64url SDP) ---------------- */
   function b64encode(bytes) {
@@ -73,14 +96,15 @@
   function signalOpen(id) {
     return new Promise((resolve, reject) => {
       const token = Math.random().toString(36).slice(2, 10);
+      diag('signaling: connecting as ' + id);
       const ws = new WebSocket(`${SIGNAL_URL}?key=peerjs&id=${id}&token=${token}`);
-      const timer = setTimeout(() => { try { ws.close(); } catch (e) {} reject(new Error('signaling timeout')); }, 8000);
+      const timer = setTimeout(() => { diag('signaling: TIMEOUT (no OPEN in 8s)'); try { ws.close(); } catch (e) {} reject(new Error('signaling timeout')); }, 8000);
       ws.onmessage = (e) => {
         let m; try { m = JSON.parse(e.data); } catch (err) { return; }
-        if (m.type === 'OPEN') { clearTimeout(timer); resolve(ws); }
-        else if (m.type === 'ID-TAKEN' || m.type === 'ERROR') { clearTimeout(timer); ws.close(); reject(new Error(m.type)); }
+        if (m.type === 'OPEN') { diag('signaling: OPEN'); clearTimeout(timer); resolve(ws); }
+        else if (m.type === 'ID-TAKEN' || m.type === 'ERROR') { diag('signaling: ' + m.type); clearTimeout(timer); ws.close(); reject(new Error(m.type)); }
       };
-      ws.onerror = () => { clearTimeout(timer); reject(new Error('signaling unreachable')); };
+      ws.onerror = () => { diag('signaling: socket ERROR (unreachable/blocked)'); clearTimeout(timer); reject(new Error('signaling unreachable')); };
     });
   }
   function startHeartbeat(ws) {
@@ -111,10 +135,12 @@
     ws.onmessage = async (m0) => {
       let m; try { m = JSON.parse(m0.data); } catch (e) { return; }
       if (m.type === 'OFFER' && m.payload && m.payload.sdp) {
+        diag('host: received guest OFFER');
         if (onStatus) onStatus('partner found — linking…');
         await pc.setRemoteDescription(m.payload.sdp);
         await pc.setLocalDescription(await pc.createAnswer());
         await gathered(pc);
+        diag('host: sent ANSWER');
         ws.send(JSON.stringify({ type: 'ANSWER', dst: m.src, payload: { sdp: pc.localDescription } }));
       }
     };
@@ -136,16 +162,19 @@
       ws.onmessage = async (m0) => {
         let m; try { m = JSON.parse(m0.data); } catch (e) { return; }
         if (m.type === 'ANSWER' && m.payload && m.payload.sdp) {
+          diag('guest: received host ANSWER');
           clearTimeout(timer);
           await pc.setRemoteDescription(m.payload.sdp);
           resolve();
         } else if (m.type === 'EXPIRE' || m.type === 'LEAVE') {
+          diag('guest: room ' + m.type + ' (host not there)');
           clearTimeout(timer); reject(new Error('room not found'));
         }
       };
     });
     await pc.setLocalDescription(await pc.createOffer());
     await gathered(pc);
+    diag('guest: sent OFFER to ' + code + ', waiting for ANSWER…');
     ws.send(JSON.stringify({ type: 'OFFER', dst: 'perils-' + code + '-h', payload: { sdp: pc.localDescription } }));
     await answered;
   };
@@ -154,7 +183,23 @@
   function makePC() {
     // STUN is optional for same-LAN play (host candidates suffice) but lets
     // the same flow work across networks for free
-    return new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    // tally candidate types: host=LAN, srflx=STUN-reflexive, relay=TURN.
+    // No srflx => STUN blocked; no host => something is hiding the LAN address.
+    const cand = {};
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        const ty = e.candidate.type || (/ typ (\w+)/.exec(e.candidate.candidate) || [])[1] || '?';
+        cand[ty] = (cand[ty] || 0) + 1;
+      } else {
+        const sum = Object.keys(cand).map(k => k + ':' + cand[k]).join(' ') || '(none!)';
+        diag('ICE candidates gathered → ' + sum);
+      }
+    };
+    pc.onicecandidateerror = (e) => diag('ICE candidate error ' + (e.errorCode || '') + ' ' + (e.url || ''));
+    pc.oniceconnectionstatechange = () => diag('ICE state: ' + pc.iceConnectionState);
+    pc.onconnectionstatechange = () => diag('peer connection: ' + pc.connectionState);
+    return pc;
   }
   function gathered(pc) {
     return new Promise((res) => {
@@ -166,9 +211,9 @@
   }
   function wireChannel(dc) {
     Net.dc = dc;
-    dc.onopen = () => { Net.active = true; Net.peerGone = false; closeSignaling(); if (Net.onOpen) Net.onOpen(); };
-    dc.onclose = () => { Net.peerGone = true; if (Net.onClose) Net.onClose(); };
-    dc.onerror = () => { Net.peerGone = true; };
+    dc.onopen = () => { diag('datachannel OPEN — connected ✔'); Net.active = true; Net.peerGone = false; closeSignaling(); if (Net.onOpen) Net.onOpen(); };
+    dc.onclose = () => { diag('datachannel closed'); Net.peerGone = true; if (Net.onClose) Net.onClose(); };
+    dc.onerror = () => { diag('datachannel error'); Net.peerGone = true; };
     dc.onmessage = (e) => handle(JSON.parse(e.data));
   }
 

@@ -78,7 +78,9 @@ Level-up pauses into a `LEVELUP` overlay without leaving `PLAYING`.
 
 ### Git Workflow
 - **Do not push after every commit.** Batch commits; push only when the user explicitly asks.
-- (Planned) pre-commit hook auto-bumps the patch version in `index.html`.
+- A pre-commit hook (`.githooks/pre-commit`) auto-bumps the patch version in `index.html`
+  (GAME_VERSION + all `?v=` query strings). Enable once per clone with
+  `git config core.hooksPath .githooks`.
 
 ### Version System
 - Version in `index.html` as `GAME_VERSION` and `?v=X.Y.Z` query strings on all assets (cache-bust).
