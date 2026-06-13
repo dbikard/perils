@@ -351,13 +351,81 @@ function playRun(botName, seed, opts) {
     rescued: game.survivors.filter(s => s.state === 'following').length };
 }
 
+/* ---- 2-player (co-op) sim ----
+ * The real co-op path runs lockstep over Net; here we swap in a loopback Net
+ * that just hands both bots' inputs straight to the same sim. Exercises the
+ * actual multiplayer update path (shared XP, revives, per-player level picks)
+ * so player-count difficulty can be tuned headlessly. */
+function makeSimNet() {
+  const rec = [{ mx: 0, my: 0, b: 0, pk: -1 }, { mx: 0, my: 0, b: 0, pk: -1 }];
+  return {
+    active: true, isHost: true, localIdx: 0, peerGone: false, desync: false, DELAY: 0,
+    setInput(i, q) { rec[i] = q; },
+    resetRun() {}, scheduleLocal() {}, ready() { return true; },
+    get(tick, p) { return rec[p]; }, gc() {}, checkSync() {},
+    onOpen: null, onStart: null, onClose: null
+  };
+}
+function resetInput() { const inp = E.input; inp.taps.length = 0; inp.keyTaps.length = 0; inp.joyActive = false; inp.joyVecX = 0; inp.joyVecY = 0; }
+function readSample() {
+  const mv = E.input.moveVector(); let b = 0;
+  for (const tp of E.input.consumeTaps()) { if (tp === 'blink') b |= 1; else if (tp === 'special') b |= 2; else if (tp === 'ultimate') b |= 4; }
+  return { mv, b };
+}
+const QSCALE = 100;
+function quantRec(mv, b, pk) {
+  return { mx: Math.max(-QSCALE, Math.min(QSCALE, Math.round(mv.x * QSCALE))),
+    my: Math.max(-QSCALE, Math.min(QSCALE, Math.round(mv.y * QSCALE))), b: b | 0, pk: pk == null ? -1 : pk };
+}
+
+function playRun2p(botName, seed, opts) {
+  const setA = makeBots(seed), setB = makeBots((seed ^ 0x5bd1e995) >>> 0);
+  const bots = [setA[botName], setB[botName]];
+  bots[0].st = {}; bots[1].st = {};
+  const simNet = makeSimNet();
+  globalThis.Net = simNet;                // must be set before startGame (it reads global.Net)
+  Run.startGame({ seed, stage: opts.stage, mp: true });
+  const game = Run.game;
+
+  const mv = [{ x: 0, y: 0 }, { x: 0, y: 0 }];
+  let pendB = [0, 0], pendPk = [-1, -1];
+  let t = 0, decideAt = 0;
+  while ((game.phase === 'PLAYING' || game.phase === 'ESCAPE') && t < MAX_TIME) {
+    if (t >= decideAt) {
+      decideAt = t + 0.1;
+      for (let i = 0; i < 2; i++) {
+        const pl = game.players[i];
+        game.player = pl;                 // bots read game.player + its helpers
+        resetInput();
+        if (!pl.dead) bots[i].act(game, t);
+        const s = readSample(); mv[i] = s.mv; pendB[i] = s.b;
+        const q = game.choiceQueues[i];   // resolve this player's queued level/cache pick
+        if (q && q.length) { const ch = bots[i].pick(game, q[0].choices); const k = q[0].choices.indexOf(ch); pendPk[i] = k < 0 ? 0 : k; }
+      }
+      game.player = game.players[0]; resetInput();
+    }
+    simNet.setInput(0, quantRec(mv[0], pendB[0], pendPk[0]));
+    simNet.setInput(1, quantRec(mv[1], pendB[1], pendPk[1]));
+    pendB = [0, 0]; pendPk = [-1, -1];    // taps + picks fire once, then clear; movement holds
+    if (ablated.has('magnet')) { game.players[0].magnet = 1; game.players[1].magnet = 1; }
+    Run.update(STEP);
+    t += STEP;
+  }
+  globalThis.Net = undefined;
+  return { time: game.timeSec, escaped: game.phase === 'VICTORY',
+    level: Math.max(game.players[0].level, game.players[1].level), kills: game.kills, seed,
+    caches: game.caches.filter(c => c.taken).length,
+    rescued: game.survivors.filter(s => s.state === 'following').length };
+}
+
 function median(arr) { const s = [...arr].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 function quartile(arr, q) { const s = [...arr].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(s.length * q))]; }
 function fmt(s) { return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`; }
 
 function runBatch(botName, runs, seed0, opts) {
+  const play = opts.players === 2 ? playRun2p : playRun;
   const results = [];
-  for (let i = 0; i < runs; i++) results.push(playRun(botName, seed0 + i * 7919, opts));
+  for (let i = 0; i < runs; i++) results.push(play(botName, seed0 + i * 7919, opts));
   const times = results.map(r => r.time);
   const esc = results.filter(r => r.escaped).length;
   const summary = {
@@ -394,9 +462,10 @@ const runs = parseInt(args.runs || '20', 10);
 const seed0 = parseInt(args.seed || '1', 10);
 const botNames = (args.bots || 'random,greedy,skilled').split(',');
 const stage = parseInt(args.stage || '1', 10);
-const opts = { trace: !!args.trace, stage };
+const players = parseInt(args.players || '1', 10);
+const opts = { trace: !!args.trace, stage, players };
 
-console.log(`Perils sim — stage ${stage} (${Run.STAGES[stage].name}), ${runs} run(s)/bot, seed base ${seed0}, warp=${Run.STAGES[stage].warpTime}s`);
+console.log(`Perils sim — stage ${stage} (${Run.STAGES[stage].name}), ${players}P, ${runs} run(s)/bot, seed base ${seed0}, warp=${Run.STAGES[stage].warpTime}s`);
 console.log(`targets: random <2:00 & ~0% escape · greedy 3:00–6:00 · skilled 25–45% escape\n`);
 
 if (args.determinism) {
