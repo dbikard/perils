@@ -20,7 +20,9 @@ html, body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  touch-action: none;
+  /* allow vertical touch-scrolling (e.g. the menu/co-op panel when it overflows);
+     gameplay touches are blocked on the canvas itself, not page-wide */
+  touch-action: pan-y;
   overscroll-behavior: none;
 }
 
@@ -31,6 +33,7 @@ html, body {
   height: 100vh;
   display: block;
   background: var(--bg);
+  touch-action: none; /* the joystick/abilities own canvas gestures — never scroll */
 }
 
 .hidden { display: none !important; }
@@ -95,6 +98,7 @@ html, body {
   justify-content: safe center;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y; /* enable drag-to-scroll inside the menu on touch */
   gap: 18px;
   background: radial-gradient(circle at 50% 40%, #0a1326 0%, #05070d 70%);
   text-align: center;
