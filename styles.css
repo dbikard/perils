@@ -264,9 +264,9 @@ html, body {
   color: #5e77a0; font-size: 10px; letter-spacing: 1px; text-decoration: underline;
 }
 #qr-display {
-  display: block; margin: 4px auto 0; width: 260px; height: auto;
-  max-width: 80vw; image-rendering: pixelated;
-  border: 8px solid #e8f1ff; border-radius: 10px;
+  display: block; margin: 6px auto 0; width: 340px; height: auto;
+  max-width: 92vw; image-rendering: pixelated;
+  background: #fff; border: 10px solid #fff; border-radius: 8px;
   box-shadow: 0 0 22px rgba(56, 232, 255, 0.4);
 }
 
