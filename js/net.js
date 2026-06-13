@@ -118,6 +118,26 @@
     if (Net._ws) { try { Net._ws.close(); } catch (e) {} Net._ws = null; }
   }
 
+  /* Keep the screen awake while pairing. On mobile, if the host's screen
+   * sleeps (or Chrome backgrounds) while the guest is scanning, the host's JS
+   * suspends and never answers the offer — the #1 cause of "no reply". */
+  let wakeLock = null;
+  async function acquireWake() {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.wakeLock && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } catch (e) { /* unsupported or blocked — best effort */ }
+  }
+  function releaseWake() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
+  if (typeof document !== 'undefined') {
+    // wake locks drop when the tab is hidden; re-acquire when it returns while pairing
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && Net._pairing) acquireWake();
+    });
+  }
+
   // host: opens a room and returns its 4-letter code; resolves the moment the
   // room exists (the guest connects later, whenever they enter the code)
   Net.hostRoom = async function (onStatus) {
@@ -130,18 +150,31 @@
     }
     startHeartbeat(ws);
     Net._ws = ws;
+    Net._pairing = true; acquireWake();
     const pc = Net.pc = makePC();
     pc.ondatachannel = (e) => wireChannel(e.channel); // the guest offers + owns the channel
+    let answering = false;
     ws.onmessage = async (m0) => {
       let m; try { m = JSON.parse(m0.data); } catch (e) { return; }
-      if (m.type === 'OFFER' && m.payload && m.payload.sdp) {
+      if (m.type !== 'OFFER' || !m.payload || !m.payload.sdp) return;
+      // the guest re-sends its offer until it hears back; once we've answered,
+      // just re-send the cached answer rather than redo the handshake
+      if (answering) {
+        if (pc.localDescription) { diag('host: re-sending ANSWER'); ws.send(JSON.stringify({ type: 'ANSWER', dst: m.src, payload: { sdp: pc.localDescription } })); }
+        return;
+      }
+      answering = true;
+      try {
         diag('host: received guest OFFER');
         if (onStatus) onStatus('partner found — linking…');
         await pc.setRemoteDescription(m.payload.sdp);
         await pc.setLocalDescription(await pc.createAnswer());
         await gathered(pc);
-        diag('host: sent ANSWER');
         ws.send(JSON.stringify({ type: 'ANSWER', dst: m.src, payload: { sdp: pc.localDescription } }));
+        diag('host: sent ANSWER');
+      } catch (err) {
+        answering = false;
+        diag('host: ANSWER failed — ' + ((err && err.message) || err));
       }
     };
     return code;
@@ -155,28 +188,44 @@
     const ws = await signalOpen('perils-' + code + '-g' + Math.random().toString(36).slice(2, 6));
     startHeartbeat(ws);
     Net._ws = ws;
+    Net._pairing = true; acquireWake();
     const pc = Net.pc = makePC();
     wireChannel(pc.createDataChannel('perils', { ordered: true }));
-    const answered = new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('no reply — check the code')), 15000);
+    await pc.setLocalDescription(await pc.createOffer());
+    await gathered(pc);
+    const offerMsg = JSON.stringify({ type: 'OFFER', dst: 'perils-' + code + '-h', payload: { sdp: pc.localDescription } });
+    // re-send the offer on an interval: if the host phone was briefly asleep or
+    // backgrounded, it can still pick up a later offer once it wakes
+    await new Promise((resolve, reject) => {
+      let tries = 0;
+      const sendOffer = () => {
+        try { ws.send(offerMsg); } catch (e) {}
+        diag(tries === 0 ? 'guest: sent OFFER to ' + code + ', waiting for ANSWER…'
+                         : 'guest: resending OFFER (' + tries + ') — host not answering yet');
+      };
+      sendOffer();
+      const retry = setInterval(() => {
+        if (++tries > 9) { // ~30s total
+          clearInterval(retry);
+          reject(new Error('no reply — make sure the host is on the HOST ROOM screen with the phone awake'));
+          return;
+        }
+        sendOffer();
+      }, 3000);
       ws.onmessage = async (m0) => {
         let m; try { m = JSON.parse(m0.data); } catch (e) { return; }
         if (m.type === 'ANSWER' && m.payload && m.payload.sdp) {
+          clearInterval(retry);
           diag('guest: received host ANSWER');
-          clearTimeout(timer);
           await pc.setRemoteDescription(m.payload.sdp);
           resolve();
         } else if (m.type === 'EXPIRE' || m.type === 'LEAVE') {
-          diag('guest: room ' + m.type + ' (host not there)');
-          clearTimeout(timer); reject(new Error('room not found'));
+          clearInterval(retry);
+          diag('guest: room ' + m.type + ' — host is not in that room');
+          reject(new Error('room not found — check the code, and that the host tapped HOST ROOM'));
         }
       };
-    });
-    await pc.setLocalDescription(await pc.createOffer());
-    await gathered(pc);
-    diag('guest: sent OFFER to ' + code + ', waiting for ANSWER…');
-    ws.send(JSON.stringify({ type: 'OFFER', dst: 'perils-' + code + '-h', payload: { sdp: pc.localDescription } }));
-    await answered;
+    }).catch((err) => { Net._pairing = false; releaseWake(); throw err; });
   };
 
   /* ---------------- connection ---------------- */
@@ -211,7 +260,7 @@
   }
   function wireChannel(dc) {
     Net.dc = dc;
-    dc.onopen = () => { diag('datachannel OPEN — connected ✔'); Net.active = true; Net.peerGone = false; closeSignaling(); if (Net.onOpen) Net.onOpen(); };
+    dc.onopen = () => { diag('datachannel OPEN — connected ✔'); Net.active = true; Net.peerGone = false; Net._pairing = false; releaseWake(); closeSignaling(); if (Net.onOpen) Net.onOpen(); };
     dc.onclose = () => { diag('datachannel closed'); Net.peerGone = true; if (Net.onClose) Net.onClose(); };
     dc.onerror = () => { diag('datachannel error'); Net.peerGone = true; };
     dc.onmessage = (e) => handle(JSON.parse(e.data));
@@ -247,6 +296,7 @@
   Net.close = function () {
     try { if (Net.dc) Net.dc.close(); if (Net.pc) Net.pc.close(); } catch (e) { /* already gone */ }
     Net.active = false; Net.dc = null; Net.pc = null;
+    Net._pairing = false; releaseWake();
   };
 
   function handle(m) {
