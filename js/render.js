@@ -446,8 +446,9 @@
     ctx.restore();
 
     let drew = false;
-    if (S && S.ready && S.ace) {
-      const set = S.ace[S.tierFor(p.armor || 0)] || S.ace.basic;
+    const sheet = (p.idx === 1 && S && S.nova) ? S.nova : (S && S.ace); // player 2 = Nova
+    if (S && S.ready && sheet) {
+      const set = sheet[S.tierFor(p.armor || 0)] || sheet.basic;
       const frame = p.moving ? (1 + (Math.floor(p.animTime * 9) % 4)) : 0; // 4-frame walk
       const spr = set[frame] || set[0];
       if (spr) {
@@ -464,10 +465,11 @@
         drew = true;
       }
     }
-    if (!drew) { // fallback while sprites load
-      ctx.fillStyle = p.hitFlash > 0 ? '#fff' : '#3a5a8f';
+    if (!drew) { // fallback while sprites load — Nova reads violet/magenta, Ace blue/cyan
+      const nova = p.idx === 1;
+      ctx.fillStyle = p.hitFlash > 0 ? '#fff' : (nova ? '#5a3a8f' : '#3a5a8f');
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
-      ctx.lineWidth = 2; ctx.strokeStyle = '#38e8ff'; ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = nova ? '#ff5ab4' : '#38e8ff'; ctx.stroke();
     }
 
     // invulnerability bubble (Blink / Deflector)
