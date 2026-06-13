@@ -112,7 +112,7 @@ html, body {
   text-shadow: 0 0 24px var(--neon-cyan), 0 0 60px rgba(56, 232, 255, 0.5);
 }
 #menu .tagline {
-  max-width: 340px;
+  max-width: min(340px, 90vw);
   color: #9fb6d8;
   font-size: 15px;
   line-height: 1.5;
