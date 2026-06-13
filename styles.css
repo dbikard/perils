@@ -20,7 +20,9 @@ html, body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  touch-action: none;
+  /* allow vertical touch-scrolling (e.g. the menu/co-op panel when it overflows);
+     gameplay touches are blocked on the canvas itself, not page-wide */
+  touch-action: pan-y;
   overscroll-behavior: none;
 }
 
@@ -31,14 +33,14 @@ html, body {
   height: 100vh;
   display: block;
   background: var(--bg);
+  touch-action: none; /* the joystick/abilities own canvas gestures — never scroll */
 }
 
 .hidden { display: none !important; }
 
-#mute {
+#mute, #fullscreen {
   position: fixed;
   top: max(8px, env(safe-area-inset-top));
-  right: max(8px, env(safe-area-inset-right));
   z-index: 40;
   width: 36px;
   height: 36px;
@@ -50,7 +52,9 @@ html, body {
   color: #fff;
   cursor: pointer;
 }
-#mute:active { transform: scale(0.94); }
+#mute { right: max(8px, env(safe-area-inset-right)); }
+#fullscreen { right: calc(max(8px, env(safe-area-inset-right)) + 44px); }
+#mute:active, #fullscreen:active { transform: scale(0.94); }
 
 /* ---- HUD ---- */
 #hud {
@@ -89,7 +93,12 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* `safe center` keeps content reachable from the scroll start when it's
+     taller than the viewport (e.g. co-op panel + diagnostics open) */
+  justify-content: safe center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y; /* enable drag-to-scroll inside the menu on touch */
   gap: 18px;
   background: radial-gradient(circle at 50% 40%, #0a1326 0%, #05070d 70%);
   text-align: center;
@@ -140,8 +149,7 @@ html, body {
   font-size: 12px;
 }
 #menu .version {
-  position: absolute;
-  bottom: 14px;
+  margin-top: 4px;
   color: #34466a;
   font-size: 11px;
 }
