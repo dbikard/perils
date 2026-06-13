@@ -825,7 +825,7 @@
     /* ---- serverless QR pairing (no signaling server; same Wi-Fi) ----
      * host shows an offer QR → guest scans it and shows an answer QR →
      * host scans that. Reuses Net.host/join/acceptAnswer (compressed SDP). */
-    const qrDisplay = $('qr-display'), qrScanReply = $('qr-scan-reply');
+    const qrDisplay = $('qr-display'), qrScanReply = $('qr-scan-reply'), qrJoin = $('qr-join');
     let pairStop = null; // stops the currently-displayed QR stream
 
     // Show a payload as a rapidly-cycling series of SMALL QR frames. One dense
@@ -856,6 +856,7 @@
       if (pairStop) { pairStop(); pairStop = null; }
       if (qrDisplay) qrDisplay.classList.add('hidden');
       if (qrScanReply) qrScanReply.classList.add('hidden');
+      if (qrJoin) qrJoin.classList.remove('hidden'); // restore the JOIN button
     };
 
     // open the camera, scan one QR, resolve its text. Android Chrome has
@@ -931,8 +932,9 @@
       try {
         const offer = await Net.host(true); // local = LAN only (no STUN → smaller code)
         if (!startPairStream(offer)) { say('could not build QR'); return; }
-        if (qrScanReply) qrScanReply.classList.remove('hidden');
-        say('1) let your partner scan this   2) tap “SCAN PARTNER’S REPLY”');
+        if (qrJoin) qrJoin.classList.add('hidden');          // replace JOIN with…
+        if (qrScanReply) qrScanReply.classList.remove('hidden'); // …SCAN REPLY
+        say('1) let your partner scan this   2) tap “SCAN REPLY”');
       } catch (e) { say('failed: ' + ((e && e.message) || e)); }
     });
     if (qrScanReply) qrScanReply.addEventListener('click', async () => {
