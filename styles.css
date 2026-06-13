@@ -259,6 +259,43 @@ html, body {
   background: none; border: none; cursor: pointer;
   color: #5e77a0; font-size: 10px; letter-spacing: 1px; text-decoration: underline;
 }
+#relay-toggle, #coop-manual-toggle {
+  background: none; border: none; cursor: pointer;
+  color: #5e77a0; font-size: 10px; letter-spacing: 1px; text-decoration: underline;
+}
+#qr-display {
+  display: block; margin: 4px auto 0; width: 260px; height: auto;
+  max-width: 80vw; image-rendering: pixelated;
+  border: 8px solid #e8f1ff; border-radius: 10px;
+  box-shadow: 0 0 22px rgba(56, 232, 255, 0.4);
+}
+
+/* fullscreen camera scanner */
+#scanner {
+  position: fixed; inset: 0; z-index: 60;
+  background: #000; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+#scan-video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+#scan-reticle {
+  position: relative; width: min(64vw, 64vh); height: min(64vw, 64vh);
+  border: 3px solid rgba(84, 255, 159, 0.9); border-radius: 16px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+}
+#scan-hint {
+  position: absolute; bottom: 120px; z-index: 1;
+  color: #e6f0ff; font-size: 14px; letter-spacing: 1px;
+  text-shadow: 0 1px 4px #000; padding: 0 24px; text-align: center;
+}
+#scan-cancel {
+  position: absolute; bottom: 48px; z-index: 1;
+  padding: 12px 32px; border-radius: 10px; cursor: pointer;
+  background: rgba(20, 30, 48, 0.9); color: #cfe6ff;
+  border: 1px solid rgba(86, 120, 170, 0.7);
+  font-size: 14px; letter-spacing: 2px; font-weight: 700;
+}
 
 /* co-op choice sheet: compact, non-blocking (game keeps running behind it) */
 #levelup.mp { background: transparent; pointer-events: none; align-items: flex-end; }

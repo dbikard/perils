@@ -820,6 +820,78 @@
     };
 
     $('coop-toggle').addEventListener('click', () => panel.classList.toggle('hidden'));
+    const relayToggle = $('relay-toggle'), relayFlow = $('relay-flow');
+    if (relayToggle && relayFlow) relayToggle.addEventListener('click', () => relayFlow.classList.toggle('hidden'));
+
+    /* ---- serverless QR pairing (no signaling server; same Wi-Fi) ----
+     * host shows an offer QR → guest scans it and shows an answer QR →
+     * host scans that. Reuses Net.host/join/acceptAnswer (compressed SDP). */
+    const qrDisplay = $('qr-display'), qrScanReply = $('qr-scan-reply');
+    const showPairQR = (code) => {
+      if (!qrDisplay || !global.QR) return false;
+      try { global.QR.render(qrDisplay, code, { size: 300, dark: '#05070d', light: '#e8f1ff' }); qrDisplay.classList.remove('hidden'); return true; }
+      catch (e) { qrDisplay.classList.add('hidden'); return false; }
+    };
+    const hidePairUI = () => { if (qrDisplay) qrDisplay.classList.add('hidden'); if (qrScanReply) qrScanReply.classList.add('hidden'); };
+
+    // open the camera, scan one QR, resolve its text. Android Chrome has
+    // BarcodeDetector; browsers without it fall back to copy-paste pairing.
+    function scanQR() {
+      return new Promise(async (resolve, reject) => {
+        const overlay = $('scanner'), video = $('scan-video'), cancel = $('scan-cancel');
+        if (!('BarcodeDetector' in window)) { reject(new Error('this browser can’t scan — use offline copy-paste below')); return; }
+        let supported = [];
+        try { supported = await window.BarcodeDetector.getSupportedFormats(); } catch (e) {}
+        if (supported.indexOf('qr_code') < 0) { reject(new Error('QR scanning unsupported — use offline copy-paste')); return; }
+        let detector;
+        try { detector = new window.BarcodeDetector({ formats: ['qr_code'] }); }
+        catch (e) { reject(new Error('QR scanning unavailable — use offline copy-paste')); return; }
+        let stream;
+        try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); }
+        catch (e) { reject(new Error('camera blocked — allow camera access, or use copy-paste')); return; }
+        video.srcObject = stream; try { await video.play(); } catch (e) {}
+        if (overlay) overlay.classList.remove('hidden');
+        let done = false;
+        const cleanup = () => { done = true; if (overlay) overlay.classList.add('hidden'); stream.getTracks().forEach((t) => t.stop()); video.srcObject = null; };
+        if (cancel) cancel.onclick = () => { cleanup(); reject(new Error('scan cancelled')); };
+        const tick = async () => {
+          if (done) return;
+          try { const codes = await detector.detect(video); if (codes && codes.length && codes[0].rawValue) { const v = codes[0].rawValue; cleanup(); resolve(v); return; } }
+          catch (e) { /* transient detect error — keep scanning */ }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+
+    $('qr-host').addEventListener('click', async () => {
+      if (Net.diagReset) Net.diagReset();
+      say('creating game…');
+      try {
+        const offer = await Net.host(true); // local = LAN only (no STUN → smaller QR)
+        if (!showPairQR(offer)) { say('could not build QR — use offline copy-paste'); return; }
+        if (qrScanReply) qrScanReply.classList.remove('hidden');
+        say('1) show this QR to your partner   2) tap “SCAN PARTNER’S REPLY”');
+      } catch (e) { say('failed: ' + ((e && e.message) || e)); }
+    });
+    if (qrScanReply) qrScanReply.addEventListener('click', async () => {
+      try {
+        const answer = await scanQR();
+        say('linking…');
+        await Net.acceptAnswer(answer);
+        hidePairUI();
+      } catch (e) { say(e.message); }
+    });
+    $('qr-join').addEventListener('click', async () => {
+      if (Net.diagReset) Net.diagReset();
+      try {
+        const offer = await scanQR();
+        say('building reply…');
+        const answer = await Net.join(offer, true);
+        if (!showPairQR(answer)) { say('could not build reply QR'); return; }
+        say('show this reply QR to the host — connecting…');
+      } catch (e) { say(e.message); }
+    });
 
     // room-code flow
     $('coop-host').addEventListener('click', async () => {
@@ -871,6 +943,7 @@
 
     Net.onOpen = () => {
       if (qr) qr.classList.add('hidden'); // paired — no need for the code anymore
+      hidePairUI();
       say(Net.isHost ? 'CONNECTED — press LAUNCH to start the run' : 'CONNECTED — waiting for the host to launch');
       const sb = document.getElementById('start-btn');
       if (!Net.isHost) sb.textContent = 'WAITING FOR HOST…';

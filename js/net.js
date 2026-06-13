@@ -229,10 +229,11 @@
   };
 
   /* ---------------- connection ---------------- */
-  function makePC() {
-    // STUN is optional for same-LAN play (host candidates suffice) but lets
-    // the same flow work across networks for free
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  function makePC(noStun) {
+    // STUN lets the relay flow work across networks; for same-LAN QR pairing we
+    // skip it so only host/mDNS candidates are gathered — a smaller SDP (smaller
+    // QR, easier to scan) and faster gathering.
+    const pc = new RTCPeerConnection(noStun ? {} : { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     // tally candidate types: host=LAN, srflx=STUN-reflexive, relay=TURN.
     // No srflx => STUN blocked; no host => something is hiding the LAN address.
     const cand = {};
@@ -266,19 +267,22 @@
     dc.onmessage = (e) => handle(JSON.parse(e.data));
   }
 
-  // host: returns the offer code to give to the guest
-  Net.host = async function () {
+  // host: returns the offer code to give to the guest. `local` skips STUN for
+  // LAN-only pairing (used by the QR flow to keep the code/QR small).
+  Net.host = async function (local) {
     Net.isHost = true; Net.localIdx = 0;
-    const pc = Net.pc = makePC();
+    Net._pairing = true; acquireWake();
+    const pc = Net.pc = makePC(local);
     wireChannel(pc.createDataChannel('perils', { ordered: true }));
     await pc.setLocalDescription(await pc.createOffer());
     await gathered(pc);
     return compress(JSON.stringify(pc.localDescription));
   };
   // guest: takes the host's offer code, returns the answer code to send back
-  Net.join = async function (offerCode) {
+  Net.join = async function (offerCode, local) {
     Net.isHost = false; Net.localIdx = 1;
-    const pc = Net.pc = makePC();
+    Net._pairing = true; acquireWake();
+    const pc = Net.pc = makePC(local);
     pc.ondatachannel = (e) => wireChannel(e.channel);
     await pc.setRemoteDescription(JSON.parse(await decompress(offerCode)));
     await pc.setLocalDescription(await pc.createAnswer());
